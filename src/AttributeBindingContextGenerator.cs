@@ -21,20 +21,32 @@ namespace FUICompiler
             var sources = new List<Source?>();
             foreach (var classDeclaration in classDeclarations)
             {
-                //一个可观察对象支持绑定到多个视图
-                if(!Utility.TryGetClassBindingAttribute(classDeclaration, out var attributes))
+                if(!Utility.IsObservableObject(classDeclaration))
                 {
                     continue;
                 }
 
                 var bindingConfig = new BindingConfig();
 
-                foreach(var attribute in attributes)
+                //一个可观察对象支持绑定到多个视图
+                if (Utility.TryGetClassBindingAttribute(classDeclaration, out var attributes))
                 {
-                    CreateContext(bindingConfig, classDeclaration, attribute);
+                    foreach (var attribute in attributes)
+                    {
+                        CreateContext(bindingConfig, classDeclaration, attribute);
+                    }
+                }
+                else
+                {
+                    CreateContext(bindingConfig, classDeclaration, null);
                 }
 
-                bindingContextGenerator.Generate(bindingConfig, ref sources, usings);
+                var @namespace = string.Empty;
+                if (Utility.TryGetNamespace(classDeclaration, out var namespaceName))
+                {
+                    @namespace = namespaceName;
+                }
+                bindingContextGenerator.Generate(bindingConfig, ref sources, usings, @namespace);
             }
 
             return sources.ToArray();
@@ -49,19 +61,27 @@ namespace FUICompiler
         void CreateContext(BindingConfig bindingConfig, ClassDeclarationSyntax classDeclaration, AttributeSyntax attribute)
         {
             var bindingContext = new BindingContext();
+
             bindingContext.type = classDeclaration.Identifier.Text;
 
-            //从特性参数中获取视图名
-            foreach (var args in attribute.ArgumentList.Arguments)
+            if(attribute == null)
             {
-                var arg = args.Expression as LiteralExpressionSyntax;
-                if (arg == null)
-                {
-                    continue;
-                }
-                bindingConfig.viewName = arg.Token.ValueText;
+                bindingConfig.viewName = string.Empty;
             }
-
+            else
+            {
+                //从特性参数中获取视图名
+                foreach (var args in attribute.ArgumentList.Arguments)
+                {
+                    var arg = args.Expression as LiteralExpressionSyntax;
+                    if (arg == null)
+                    {
+                        continue;
+                    }
+                    bindingConfig.viewName = arg.Token.ValueText;
+                }
+            }
+            
             //获取属性绑定
             foreach (var property in classDeclaration.ChildNodes().OfType<PropertyDeclarationSyntax>())
             {
@@ -78,7 +98,11 @@ namespace FUICompiler
                 }
             }
 
-            bindingConfig.contexts.Add(bindingContext);
+            //如果没有通过特性绑定属性 则不生成绑定上下文
+            if(bindingContext.properties.Count > 0)
+            {
+                bindingConfig.contexts.Add(bindingContext);
+            }
         }
 
         /// <summary>

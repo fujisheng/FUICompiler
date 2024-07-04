@@ -14,11 +14,13 @@
         const string DefaultViewModelTypeMark = "*DefaultViewModelType*";
         const string PropertyChangedFunctionsMark = "*PropertyChangedFunctions*";
         const string UsingMark = "*Using*";
+        const string NamespaceMark = "*Namespace*";
+        const string DefaultNamespace = "__DataBindingGenerated";
 
 
         const string Template = @"
 *Using*
-namespace __DataBindingGenerated
+namespace *Namespace*
 {
     [FUI.ViewModelAttribute(typeof(*DefaultViewModelType*))]
     [FUI.ViewAttribute(""*ViewName*"")]

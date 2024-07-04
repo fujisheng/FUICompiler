@@ -28,7 +28,7 @@ namespace FUICompiler
             return result.ToArray();
         }
 
-        internal void Generate(BindingConfig config, ref List<Source?> result, IEnumerable<string> usings = null)
+        internal void Generate(BindingConfig config, ref List<Source?> result, IEnumerable<string> usings = null, string @namespace = null)
         {
             foreach (var bindingContext in config.contexts)
             {
@@ -121,6 +121,11 @@ namespace FUICompiler
                         usingBuilder.AppendLine($"using {@using};");
                     }
                 }
+
+                //添加Namespace
+                var @namespaceName = string.IsNullOrEmpty(@namespace) ? DefaultNamespace : @namespace;
+                code = code.Replace(NamespaceMark, @namespaceName);
+
                 code = code.Replace(UsingMark, usingBuilder.ToString());
 
                 //格式化代码

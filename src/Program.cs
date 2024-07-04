@@ -10,8 +10,8 @@ const string contextGenerateTypeMark = "--ctx_type";
 
 
 var compiler = new Compiler();
-//string workspace = "..\\..\\..\\..\\..\\";
-//args = $"--sln={workspace}.\\FUI.sln --project=FUI.Test --output={workspace}.\\Library\\ScriptAssemblies\\FUI.Test.dll --binding={workspace}.\\Library\\Binding\\ --generated={workspace}.\\Temp\\BindingGenerated\\".Split(' ');
+//string workspace = "..\\..\\..\\..\\..\\..\\FUI\\";
+//args = $"--sln={workspace}.\\FUI.sln --project=FUI.Test --output={workspace}.\\Library\\ScriptAssemblies\\FUI.Test.dll --binding={workspace}.\\Binding\\ --generated={workspace}.\\Temp\\BindingGenerated\\".Split(' ');
 var param = ParseArgs(args);
 
 if(param.contextGenerateType == BindingContextGenerateType.Mix || param.contextGenerateType == BindingContextGenerateType.Attribute)
