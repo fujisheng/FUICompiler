@@ -237,9 +237,12 @@ namespace FUICompiler
         /// <returns></returns>
         public static bool IsObservableObject(TypeDefinition type)
         {
-            if(type.CustomAttributes == null)
+            if(type.BaseType != null)
             {
-                return false;
+                if(ObservableObjectBaseTypes.Contains(type.BaseType.FullName))
+                {
+                    return true;
+                }
             }
 
             foreach(var attribute in type.CustomAttributes)

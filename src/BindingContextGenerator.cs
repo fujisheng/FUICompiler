@@ -131,8 +131,8 @@ namespace FUICompiler
                 //格式化代码
                 code = Utility.NormalizeCode(code);
                 //Console.WriteLine(code);
-                Console.WriteLine($"generate data binding for {config.viewName}");
-                result.Add(new Source($"{config.viewName}.DataBinding", code));
+                Console.WriteLine($"generate data binding for {vmName}:{config.viewName}");
+                result.Add(new Source($"{vmName}_{config.viewName}.DataBinding", code));
             }
         }
 
