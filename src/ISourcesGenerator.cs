@@ -27,15 +27,7 @@ namespace FUICompiler
     /// </summary>
     internal interface ITypeSyntaxNodeSourcesGenerator
     {
-        Source?[] Generate(SyntaxNode root);
-    }
-
-    /// <summary>
-    /// 类型语法树修改器
-    /// </summary>
-    internal interface ITypeSyntaxNodeModifier
-    {
-         SyntaxNode Modify(SyntaxNode root);
+        Source?[] Generate(SyntaxNode root, out SyntaxNode newRoot);
     }
 
     /// <summary>

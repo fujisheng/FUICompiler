@@ -10,8 +10,8 @@ const string contextGenerateTypeMark = "--ctx_type";
 
 
 var compiler = new Compiler();
-//string workspace = "..\\..\\..\\..\\..\\..\\FUI\\";
-//args = $"--sln={workspace}.\\FUI.sln --project=FUI.Test --output={workspace}.\\Library\\ScriptAssemblies\\FUI.Test.dll --binding={workspace}.\\Binding\\ --generated={workspace}.\\Temp\\BindingGenerated\\".Split(' ');
+string workspace = "..\\..\\..\\..\\..\\..\\FUI\\";
+args = $"--sln={workspace}.\\FUI.sln --project=FUI.Test --output={workspace}.\\Library\\ScriptAssemblies\\FUI.Test.dll --binding={workspace}.\\Binding\\ --generated={workspace}.\\Temp\\BindingGenerated\\".Split(' ');
 var param = ParseArgs(args);
 
 if(param.contextGenerateType == BindingContextGenerateType.Mix || param.contextGenerateType == BindingContextGenerateType.Attribute)
@@ -24,9 +24,9 @@ if(param.contextGenerateType == BindingContextGenerateType.Mix || param.contextG
     compiler.beforeCompilerSourcesGenerators.Add(new BindingContextGenerator(param.bindingPath, ".binding"));
 }
 
-compiler.typeSyntaxRootGenerators.Add(new BindablePropertyDelegateGenerator());
-compiler.typeSyntaxModifiers.Add(new ObservableObjectKeywordModifier());
-compiler.typeDefinationInjectors.Add(new PropertyChangedInjector());
+compiler.typeSyntaxRootGenerators.Add(new ObservableObjectAppendGenerator());
+//compiler.typeSyntaxModifiers.Add(new ObservableObjectKeywordModifier());
+//compiler.typeDefinationInjectors.Add(new PropertyChangedInjector());
 
 
 Console.WriteLine($"start build sln:{param.solutionPath} project:{param.projectName} output:{param.output} binding:{param.bindingPath} context_generate_type:{param.contextGenerateType}");

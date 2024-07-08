@@ -1,4 +1,5 @@
 ﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace FUICompiler
@@ -10,7 +11,7 @@ namespace FUICompiler
     {
         BindingContextGenerator bindingContextGenerator = new BindingContextGenerator(null, null);
 
-        public Source?[] Generate(SyntaxNode root)
+        public Source?[] Generate(SyntaxNode root, out SyntaxNode newRoot)
         {
             var usings = root.DescendantNodes().OfType<UsingDirectiveSyntax>().ToArray().Select(item=> 
             {
@@ -48,7 +49,7 @@ namespace FUICompiler
                 }
                 bindingContextGenerator.Generate(bindingConfig, ref sources, usings, @namespace);
             }
-
+            newRoot = root;
             return sources.ToArray();
         }
 

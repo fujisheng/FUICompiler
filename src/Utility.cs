@@ -98,11 +98,21 @@ namespace FUICompiler
         /// <summary>
         /// 获取属性更改委托名字
         /// </summary>
-        /// <param name="propertyName"></param>
+        /// <param name="propertyName">属性名</param>
         /// <returns></returns>
         public static string GetPropertyChangedDelegateName(string propertyName)
         {
             return $"_{propertyName}_Changed";
+        }
+
+        /// <summary>
+        /// 获取属性BackingField名字
+        /// </summary>
+        /// <param name="propertyName">属性名</param>
+        /// <returns></returns>
+        public static string GetPropertyBackingFieldName(string propertyName)
+        {
+            return $"_{propertyName}_BackingField";
         }
 
         /// <summary>

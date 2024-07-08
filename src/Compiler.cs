@@ -83,7 +83,6 @@ namespace FUICompiler
     internal class Compiler
     {
         public List<ITypeSyntaxNodeSourcesGenerator> typeSyntaxRootGenerators = new List<ITypeSyntaxNodeSourcesGenerator>();
-        public List<ITypeSyntaxNodeModifier> typeSyntaxModifiers = new List<ITypeSyntaxNodeModifier>();
         public List<IBeforeCompilerSourcesGenerator> beforeCompilerSourcesGenerators = new List<IBeforeCompilerSourcesGenerator>();
         public List<ITypeDefinationInjector> typeDefinationInjectors = new List<ITypeDefinationInjector>();
 
@@ -210,19 +209,20 @@ namespace FUICompiler
                     continue;
                 }
 
-                //修改类型语法树
-                if (typeSyntaxModifiers.Count != 0)
+                //根据类型语法树生成代码
+                foreach(var type in typeSyntaxRootGenerators)
                 {
-                    foreach (var typeModifier in typeSyntaxModifiers)
+                    var append = type.Generate(root, out var newRoot);
+                    AddSources(addition, append);
+                    if(newRoot == root)
                     {
-                        root = typeModifier.Modify(root);
+                        continue;
                     }
-                    var newDocument = document.WithSyntaxRoot(root);
+
+                    root = newRoot;
+                    var newDocument = document.WithSyntaxRoot(newRoot);
                     temp.Add((document.Id, newDocument));
                 }
-
-                //根据类型语法树生成代码
-                typeSyntaxRootGenerators.ForEach((item) => AddSources(addition, item.Generate(root)));
             }
 
             foreach (var item in temp)
