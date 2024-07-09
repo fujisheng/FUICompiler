@@ -105,12 +105,11 @@ namespace FUICompiler
                     appendBuilder.AppendLine("}");
                 }
                 var code = Utility.NormalizeCode(appendBuilder.ToString());
-                Console.WriteLine($"generate property changed delegate for {oldClass.Identifier.Text}");
-                Console.WriteLine(code);
+                Console.WriteLine($"generate property changed for {oldClass.Identifier.Text}");
                 sources.Add(new Source($"{oldClass.Identifier.Text}.PropertyChanged", code));
                 return newClass;
             });
-            Console.WriteLine(newRoot.NormalizeWhitespace());
+
             return sources.ToArray();
         }
 
@@ -123,14 +122,8 @@ namespace FUICompiler
             propertyDelegateBuilder.AppendLine("}");
         }
 
-        const string SetBody = @"
-if(this.{FieldName} is System.IEquatable<{Type}> && this.{FieldName}.Equals(value)) 
-{
-    return; 
-}
-var preValue = this.{FieldName}; 
-this.{FieldName} = value; 
-{DelegateName}?.Invoke(this, preValue, value);";
+        //为了不影响报错时的代码定位，这里都保持一行
+        const string SetBody = @"if(this.{FieldName} is System.IEquatable<{Type}> && this.{FieldName}.Equals(value)) {return; }var preValue = this.{FieldName}; this.{FieldName} = value; {DelegateName}?.Invoke(this, preValue, value);";
         const string GetBody = "return this.{FieldName};";
 
         PropertyDeclarationSyntax ModifyPropertyGetSet(PropertyDeclarationSyntax property, string fieldName, string delegateName)

@@ -25,7 +25,6 @@ if(param.contextGenerateType == BindingContextGenerateType.Mix || param.contextG
 }
 
 compiler.typeSyntaxRootGenerators.Add(new ObservableObjectAppendGenerator());
-//compiler.typeSyntaxModifiers.Add(new ObservableObjectKeywordModifier());
 //compiler.typeDefinationInjectors.Add(new PropertyChangedInjector());
 
 
