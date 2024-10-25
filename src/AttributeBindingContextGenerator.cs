@@ -95,7 +95,7 @@ namespace FUICompiler
                 //为每个属性创建绑定
                 foreach (var propertyAttribute in propertyAttributes)
                 {
-                    CreateProperty(property, propertyAttribute, bindingContext);
+                    CreateProperty(classDeclaration, property, propertyAttribute, bindingContext);
                 }
             }
 
@@ -112,23 +112,35 @@ namespace FUICompiler
         /// <param name="property">属性定义文件</param>
         /// <param name="propertyAttribute">属性特性</param>
         /// <param name="bindingContext">当前绑定上下文配置</param>
-        void CreateProperty(PropertyDeclarationSyntax property, AttributeSyntax propertyAttribute, BindingContext bindingContext)
+        void CreateProperty(ClassDeclarationSyntax clazz, PropertyDeclarationSyntax property, AttributeSyntax propertyAttribute, BindingContext bindingContext)
         {
-            var propertyName = property.Identifier.Text;
-            var propertyType = property.Type.ToString();
             var elementType = string.Empty;
             var elementPath = string.Empty;
             var converterType = string.Empty;
+            var targetPropertyName = string.Empty;
+            var bindingType = BindingType.OneWay;
 
             for (int i = 0; i < propertyAttribute.ArgumentList.Arguments.Count; i++)
             {
                 var args = propertyAttribute.ArgumentList.Arguments[i];
 
+                //当参数是字符串字面量时 说明是元素路径
                 if (args.Expression is LiteralExpressionSyntax arg)
                 {
                     elementPath = arg.Token.ValueText;
                 }
 
+                //解析nameof  说明是绑定到某个element的某个属性
+                if(args.Expression is InvocationExpressionSyntax invocationArgs && invocationArgs.Expression.ToString() == "nameof")
+                {
+                    var a = invocationArgs.ArgumentList.Arguments[0];
+                    var expression = a.ToString();
+                    var lastDotIndex = expression.IndexOf('.');
+                    elementType = expression.Substring(0, lastDotIndex);
+                    targetPropertyName = expression.Substring(lastDotIndex + 1);
+                }
+
+                //当参数是类型时 说明是元素类型或转换器类型
                 if (args.Expression is TypeOfExpressionSyntax typeArg)
                 {
                     //当有可选参数 且参数名为elementType时 说明是元素类型
@@ -156,15 +168,27 @@ namespace FUICompiler
                         elementType = typeArg.Type.ToString();
                     }
                 }
+
+                //当参数是成员访问表达式时 说明是绑定类型
+                if(args.Expression is MemberAccessExpressionSyntax memberAccess)
+                {
+                    bindingType = Enum.Parse<BindingType>(memberAccess.Name.ToString());
+                }
             }
+
+            var propertyName = property.Identifier.Text;
+            var propertyType = property.Type.ToString();
+            var isList = Utility.IsObservableList(clazz, property);
 
             bindingContext.properties.Add(new BindingProperty
             {
                 name = propertyName,
-                type = new TypeInfo { fullName = propertyType, name = propertyType},
+                type = new TypeInfo { fullName = propertyType, name = propertyType, isList = isList},
                 elementType = new TypeInfo { fullName = elementType, name = elementType},
                 converterType = new TypeInfo { fullName = converterType , name = converterType},
-                elementPath = elementPath
+                elementPath = elementPath,
+                bindingType = bindingType, 
+                elementPropertyName = targetPropertyName,
             });
 
             //Console.WriteLine($"property:{propertyName}  type:{propertyType} elementName:{elementPath}  elementType:{elementType} converterType:{converterType}");

@@ -241,6 +241,37 @@ namespace FUICompiler
         }
 
         /// <summary>
+        /// 可绑定属性忽略特性名
+        /// </summary>
+        static string[] ObservableListTypeNames = new string[]
+        {
+            "ObservableList",
+            "FUI.ObservableList",
+        };
+
+        /// <summary>
+        /// 判断一个属性是否是可观察列表
+        /// </summary>
+        /// <param name="clazz"></param>
+        /// <param name="propertyDeclaration"></param>
+        /// <returns></returns>
+        public static bool IsObservableList(ClassDeclarationSyntax clazz, PropertyDeclarationSyntax propertyDeclaration)
+        {
+            if (!IsObservableProperty(clazz, propertyDeclaration))
+            {
+                return false;
+            }
+
+            var propertyType = propertyDeclaration.Type;
+            if (!(propertyType is GenericNameSyntax genericName))
+            {
+                return false;
+            }
+
+            return ObservableListTypeNames.Contains(genericName.Identifier.Text);
+        }
+
+        /// <summary>
         /// 判断一个类型定义是否为可观察对象
         /// </summary>
         /// <param name="type">类型定义</param>

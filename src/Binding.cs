@@ -6,6 +6,7 @@
         public string fullName;
         public bool isGenericType;
         public bool isValueType;
+        public bool isList;
         public List<TypeInfo> genericArguments = new List<TypeInfo>();
 
         public static TypeInfo Create(Type type)
@@ -51,6 +52,12 @@
         }
     }
 
+    public enum BindingType
+    {
+        OneWay,
+        TwoWay,
+    }
+
     public class BindingProperty
     {
         public string name;
@@ -62,6 +69,9 @@
         public TypeInfo converterValueType;
         public TypeInfo converterTargetType;
         public TypeInfo elementValueType;
+        public string elementPropertyName;
+
+        public BindingType bindingType;
     }
 
     public class BindingContext

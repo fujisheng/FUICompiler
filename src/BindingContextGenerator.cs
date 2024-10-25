@@ -28,6 +28,12 @@ namespace FUICompiler
             return result.ToArray();
         }
 
+        //将类型名转换成合法的C#命名
+        static string GetFormattedType(string type)
+        {
+            return type.Replace(".", "_");
+        }
+
         internal void Generate(BindingConfig config, ref List<Source?> result, IEnumerable<string> usings = null, string @namespace = null)
         {
             foreach (var bindingContext in config.contexts)
@@ -49,29 +55,20 @@ namespace FUICompiler
                 //为每个属性生成对应的委托 并添加绑定代码和解绑代码
                 foreach (var property in bindingContext.properties)
                 {
-                    var delegateName = Utility.GetPropertyChangedDelegateName(property.name);
-                    propertyDelegates.Add(delegateName);
+                    BuildNormalPropertyBinding(bindingContext, vmName, property,
+                            ref propertyDelegates, //属性对应的委托
+                            ref converterTypes, //转换器类型
+                            ref bingingFunctionsBuilder, //属性对应的绑定方法
+                            ref bindingItemsBuilder, //属性对应的绑定代码
+                            ref unbindingItemsBuilder);//属性对应的解绑代码
 
-                    //构建值转换
-                    var convert = BuildConvert(bindingContext.type, property);
-
-                    //为属性生成对应的绑定方法
-                    var propertyChangedFunctionName = $"{vmName}_{property.name}_PropertyChanged";
-                    var elementType = property.elementType.IsNull() ? string.Empty : $"<{property.elementType.ToTypeString()}>";
-                    bingingFunctionsBuilder.AppendLine(BindingItemFunctionTemplate.Replace(PropertyChangedFunctionNameMark, propertyChangedFunctionName)
-                        .Replace(PropertyNameMark, property.name))
-                        .Replace(PropertyTypeMark, property.type.ToTypeString())
-                        .Replace(ConvertMark, convert)
-                        .Replace(ElementTypeMark, elementType)
-                        .Replace(ElementPathMark, property.elementPath);
-
-                    //生成属性绑定代码
-                    bindingItemsBuilder.AppendLine($"{vmName}.{delegateName} += {propertyChangedFunctionName};");
-
-                    //生成属性解绑代码
-                    unbindingItemsBuilder.AppendLine($"{vmName}.{delegateName} -= {propertyChangedFunctionName};");
-
-                    converterTypes.Add(property.converterType.ToTypeString());
+                    if (property.type.isList)
+                    {
+                        BuildListBinding(vmName, property, 
+                            ref bindingItemsBuilder, 
+                            ref unbindingItemsBuilder, 
+                            ref bingingFunctionsBuilder);
+                    }
                 }
 
                 //组装绑定代码
@@ -93,40 +90,17 @@ namespace FUICompiler
 
                 //生成所有的转换器构造代码
                 var convertersBuilder = new StringBuilder();
-                foreach (var converterType in converterTypes)
-                {
-                    if (string.IsNullOrEmpty(converterType))
-                    {
-                        continue;
-                    }
-                    convertersBuilder.AppendLine($"{converterType} {GetFormattedType(converterType)} = new {converterType}();");
-                }
+                BuildConverterCostructor(converterTypes, ref convertersBuilder);
                 code = code.Replace(ConvertersMark, convertersBuilder.ToString());
 
                 //添加using
                 var usingBuilder = new StringBuilder();
-                if(usings == null)
-                {
-                    usingBuilder.AppendLine("");
-                }
-                else
-                {
-                    foreach(var @using in usings)
-                    {
-                        if (string.IsNullOrEmpty(@using))
-                        {
-                            continue;
-                        }
-
-                        usingBuilder.AppendLine($"using {@using};");
-                    }
-                }
+                BuildUsings(usings, ref usingBuilder);
+                code = code.Replace(UsingMark, usingBuilder.ToString());
 
                 //添加Namespace
                 var @namespaceName = string.IsNullOrEmpty(@namespace) ? DefaultNamespace : @namespace;
                 code = code.Replace(NamespaceMark, @namespaceName);
-
-                code = code.Replace(UsingMark, usingBuilder.ToString());
 
                 //格式化代码
                 code = Utility.NormalizeCode(code);
@@ -134,6 +108,45 @@ namespace FUICompiler
                 Console.WriteLine($"generate data binding for {vmName}:{config.viewName}");
                 result.Add(new Source($"{vmName}_{config.viewName}.DataBinding", code));
             }
+        }
+
+        //构建普通属性绑定
+        void BuildNormalPropertyBinding(BindingContext bindingContext, string vmName, BindingProperty property, 
+            ref HashSet<string> propertyDelegates,
+            ref HashSet<string> converterTypes,
+            ref StringBuilder bindingFunctionBuilder, 
+            ref StringBuilder bindingItemsBuilder, 
+            ref StringBuilder unbindingItemsBuilder)
+        {
+            var delegateName = Utility.GetPropertyChangedDelegateName(property.name);
+            propertyDelegates.Add(delegateName);
+
+            //构建值转换
+            var convert = BuildConvert(bindingContext.type, property);
+
+            //为属性生成对应的绑定方法
+            var propertyChangedFunctionName = $"{vmName}_{property.name}_PropertyChanged";
+            var elementUpdateValue = string.IsNullOrEmpty(property.elementPropertyName)
+                ? ElementUpdateValue
+                : ElementPropertyUpdateValue.Replace(ElementTypeMark, property.elementType.ToTypeString()).Replace(ElementPropertyNameMark, property.elementPropertyName);
+            var elementType = property.elementType.IsNull() ? string.Empty : $"<{property.elementType.ToTypeString()}>";
+            bindingFunctionBuilder.AppendLine(BindingItemFunctionTemplate.Replace(PropertyChangedFunctionNameMark, propertyChangedFunctionName)
+                .Replace(PropertyNameMark, property.name))
+                .Replace(PropertyTypeMark, property.type.ToTypeString())
+                .Replace(ConvertMark, convert)
+                .Replace(ElementTypeMark, elementType)
+                .Replace(ElementPathMark, property.elementPath)
+                .Replace(ElementUpdateValueMark, elementUpdateValue);
+
+            //生成属性绑定代码
+            bindingItemsBuilder.AppendLine($"{vmName}.{delegateName} += {propertyChangedFunctionName};");
+
+            //生成属性解绑代码
+            unbindingItemsBuilder.AppendLine($"{vmName}.{delegateName} -= {propertyChangedFunctionName};");
+
+            Console.WriteLine(bindingFunctionBuilder.ToString());
+
+            converterTypes.Add(property.converterType.ToTypeString());
         }
 
         /// <summary>
@@ -158,9 +171,106 @@ namespace FUICompiler
             return convertBuilder.ToString();
         }
 
-        static string GetFormattedType(string type)
+        //构建列表属性绑定
+        void BuildListBinding(string vmName, BindingProperty property,
+            ref StringBuilder bindingItemBuilder,
+            ref StringBuilder unbindingItemBuilder,
+            ref StringBuilder functionBuilder)
         {
-            return type.Replace(".", "_");
+            bindingItemBuilder.AppendLine($"{vmName}.{property.name}.CollectionAdd += OnList_{property.name}_Add;");
+            bindingItemBuilder.AppendLine($"{vmName}.{property.name}.CollectionRemove += OnList_{property.name}_Remove;");
+            bindingItemBuilder.AppendLine($"{vmName}.{property.name}.CollectionReplace += OnList_{property.name}_Replace;");
+            bindingItemBuilder.AppendLine($"{vmName}.{property.name}.CollectionUpdate += OnList_{property.name}_Update;");
+
+            unbindingItemBuilder.AppendLine($"{vmName}.{property.name}.CollectionAdd -= OnList_{property.name}_Add;");
+            unbindingItemBuilder.AppendLine($"{vmName}.{property.name}.CollectionRemove -= OnList_{property.name}_Remove;");
+            unbindingItemBuilder.AppendLine($"{vmName}.{property.name}.CollectionReplace -= OnList_{property.name}_Replace;");
+            unbindingItemBuilder.AppendLine($"{vmName}.{property.name}.CollectionUpdate -= OnList_{property.name}_Update;");
+
+            var elementType = property.elementType.IsNull() ? string.Empty : $"<{property.elementType.ToTypeString()}>";
+            var baseTemplate = BindingListTemplate
+                .Replace(PropertyNameMark, property.name)
+                .Replace(ElementTypeMark, elementType)
+                .Replace(ElementPathMark, property.elementPath);
+
+            functionBuilder.AppendLine(baseTemplate
+                .Replace(OperatorMark, "Add")
+                .Replace(ListParamsMark, ListAddParams)
+                .Replace(OnOperateMark, OnListAdd));
+
+            functionBuilder.AppendLine(baseTemplate
+                .Replace(OperatorMark, "Remove")
+                .Replace(ListParamsMark, ListRemoveParams)
+                .Replace(OnOperateMark, OnListRemove));
+
+            functionBuilder.AppendLine(baseTemplate
+                .Replace(OperatorMark, "Replace")
+                .Replace(ListParamsMark, ListReplaceParams)
+                .Replace(OnOperateMark, OnListReplace));
+
+            functionBuilder.AppendLine(baseTemplate
+                .Replace(OperatorMark, "Update")
+                .Replace(ListParamsMark, ListUpdateParams)
+                .Replace(OnOperateMark, OnListUpdate));
+        }
+
+        //构造所有的转换器构造代码
+        void BuildConverterCostructor(HashSet<string> converterTypes, ref StringBuilder convertersBuilder)
+        {
+            foreach (var converterType in converterTypes)
+            {
+                if (string.IsNullOrEmpty(converterType))
+                {
+                    continue;
+                }
+                convertersBuilder.AppendLine($"{converterType} {GetFormattedType(converterType)} = new {converterType}();");
+            }
+        }
+
+        //构造所有的using
+        void BuildUsings(IEnumerable<string> usings, ref StringBuilder usingBuilder)
+        {
+            if (usings == null)
+            {
+                usingBuilder.AppendLine("");
+            }
+            else
+            {
+                foreach (var @using in usings)
+                {
+                    if (string.IsNullOrEmpty(@using))
+                    {
+                        continue;
+                    }
+
+                    usingBuilder.AppendLine($"using {@using};");
+                }
+            }
+        }
+
+        void BuildV2VMBinding(string vmName, BindingProperty property,
+            ref StringBuilder bindingItemBuilder,
+            ref StringBuilder unbindingItemBuilder,
+            ref StringBuilder functionBuilder)
+        {
+            var elementType = property.elementType.IsNull() ? string.Empty : $"<{property.elementType.ToTypeString()}>";
+            var elementName = GetFormatName(property.elementPath);
+            bindingItemBuilder.AppendLine($"var @{elementName} = this.View.GetVisualElement{elementType}(\"{property.elementPath}\")");
+            bindingItemBuilder.AppendLine($"if(@{elementName} is FUI.IObservableVisualElement)");
+            bindingItemBuilder.AppendLine("{");
+            bindingItemBuilder.AppendLine($"@{elementName}.OnValueChanged += OnElement_{elementName}_ValueChanged;");
+            bindingItemBuilder.AppendLine("}");
+
+            unbindingItemBuilder.AppendLine($"var @{elementName} = this.View.GetVisualElement{elementType}(\"{property.elementPath}\")");
+            unbindingItemBuilder.AppendLine($"if(@{elementName} is FUI.IObservableVisualElement)");
+            unbindingItemBuilder.AppendLine("{");
+            unbindingItemBuilder.AppendLine($"@{elementName}.OnValueChanged -= OnElement_{elementName}_ValueChanged;");
+            unbindingItemBuilder.AppendLine("}");
+        }
+
+        string GetFormatName(string path)
+        {
+            return path.Replace(".", "_").Replace("/", "_").Replace(" ", "_");
         }
     }
 }
