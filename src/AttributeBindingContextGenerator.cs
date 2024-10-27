@@ -143,13 +143,6 @@ namespace FUICompiler
                 //当参数是类型时 说明是元素类型或转换器类型
                 if (args.Expression is TypeOfExpressionSyntax typeArg)
                 {
-                    //当有可选参数 且参数名为elementType时 说明是元素类型
-                    if (args.NameColon != null && args.NameColon.Name.ToString() == "elementType")
-                    {
-                        elementType = typeArg.Type.ToString();
-                        continue;
-                    }
-
                     //当有可选参数 且参数名为converterType时 说明是转换器类型
                     if (args.NameColon != null && args.NameColon.Name.ToString() == "converterType")
                     {
@@ -158,14 +151,9 @@ namespace FUICompiler
                     }
 
                     //当有多个参数且都不是可选参数时 按照顺序分别为元素类型和转换器类型
-                    if (i == 1)
-                    {
-                        converterType = typeArg.Type.ToString();
-                    }
-
                     if (i == 2)
                     {
-                        elementType = typeArg.Type.ToString();
+                        converterType = typeArg.Type.ToString();
                     }
                 }
 

@@ -66,20 +66,25 @@ namespace *Namespace*
 void *PropertyChangedFunctionName*(object sender, *PropertyType* preValue, *PropertyType* @value)
 {
     *Convert*
-    var element = this.View.GetVisualElement*ElementType*(""*ElementPath*"");
+    if(!(this.View is FUI.IElement e))
+    {
+        throw new System.Exception($""{this.View.Name} not FUI.IElement""); 
+    }
+    var element = e.GetChild*ElementType*(""*ElementPath*"");
     if(element == null)
     {
-        throw new System.Exception($""{this.View.Name} GetVisualElement type:*ElementType* path:{@""*ElementPath*""} failed""); 
+        throw new System.Exception($""{this.View.Name} GetChild type:*ElementType* path:{@""*ElementPath*""} failed""); 
     }
     *ElementUpdateValue*
 }
 ";
         const string ElementUpdateValue = "element.UpdateValue(convertedValue);";
         const string ElementPropertyUpdateValue = @"
-if(element is *ElementType* *ElementType*)
-{
-    *ElementType*.*ElementPropertyName*.Value = convertedValue;
-}
+    if(element is *ElementType* typedElement)
+    {
+        var exception = $""Cannot convert the property *ViewModelType*.*PropertyName*(*PropertyType*) to the property *ElementType*.*ElementPropertyName*({typedElement.*ElementPropertyName*.GetType()}), please consider using Convertor for this binding..."";
+        typedElement.*ElementPropertyName*.SetValue(convertedValue, exception);
+    }
 ";
 
 
@@ -98,15 +103,19 @@ if(element is *ElementType* *ElementType*)
         const string BindingListTemplate = @"
 void OnList_*PropertyName*_*Operator**ListParams*
 {
-    var element = this.View.GetVisualElement*ElementType*(""*ElementPath*"");
+    if(!(this.View is FUI.IElement e))
+    {
+        throw new System.Exception($""{this.View.Name} not FUI.IElement""); 
+    }
+    var element = e.GetChild*ElementType*(""*ElementPath*"");
     if(element == null)
     {
-        throw new System.Exception($""{this.View.Name} GetVisualElement type:*ElementType* path:{@""*ElementPath*""} failed""); 
+        throw new System.Exception($""{this.View.Name} GetChild type:*ElementType* path:{@""*ElementPath*""} failed""); 
     }
 
-    if(element is FUI.IListViewElement listViewElement)
+    if(element is FUI.IListView listView)
     {
-        listViewElement.*OnOperate*;
+        listView.*OnOperate*;
     }
 }
 ";

@@ -128,7 +128,13 @@ namespace FUICompiler
             var propertyChangedFunctionName = $"{vmName}_{property.name}_PropertyChanged";
             var elementUpdateValue = string.IsNullOrEmpty(property.elementPropertyName)
                 ? ElementUpdateValue
-                : ElementPropertyUpdateValue.Replace(ElementTypeMark, property.elementType.ToTypeString()).Replace(ElementPropertyNameMark, property.elementPropertyName);
+                : ElementPropertyUpdateValue
+                    .Replace(ElementTypeMark, property.elementType.ToTypeString())
+                    .Replace(ElementPropertyNameMark, property.elementPropertyName)
+                    .Replace(PropertyNameMark, property.name)
+                    .Replace(PropertyTypeMark, property.type.ToTypeString())
+                    .Replace(ViewModelTypeMark, vmName);
+
             var elementType = property.elementType.IsNull() ? string.Empty : $"<{property.elementType.ToTypeString()}>";
             bindingFunctionBuilder.AppendLine(BindingItemFunctionTemplate.Replace(PropertyChangedFunctionNameMark, propertyChangedFunctionName)
                 .Replace(PropertyNameMark, property.name))
@@ -144,7 +150,7 @@ namespace FUICompiler
             //生成属性解绑代码
             unbindingItemsBuilder.AppendLine($"{vmName}.{delegateName} -= {propertyChangedFunctionName};");
 
-            Console.WriteLine(bindingFunctionBuilder.ToString());
+            //Console.WriteLine(bindingFunctionBuilder.ToString());
 
             converterTypes.Add(property.converterType.ToTypeString());
         }
