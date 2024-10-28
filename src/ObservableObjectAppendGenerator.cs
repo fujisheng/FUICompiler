@@ -123,7 +123,7 @@ namespace FUICompiler
         }
 
         //为了不影响报错时的代码定位，这里都保持一行
-        const string SetBody = @"if(this.{FieldName} is System.IEquatable<{Type}> && this.{FieldName}.Equals(value)) {return; }var preValue = this.{FieldName}; this.{FieldName} = value; {DelegateName}?.Invoke(this, preValue, value);";
+        const string SetBody = @"if(System.Collections.Generic.EqualityComparer<{Type}>.Default.Equals(this.{FieldName}, value)) {return; }var preValue = this.{FieldName}; this.{FieldName} = value; {DelegateName}?.Invoke(this, preValue, value);";
         const string GetBody = "return this.{FieldName};";
 
         PropertyDeclarationSyntax ModifyPropertyGetSet(PropertyDeclarationSyntax property, string fieldName, string delegateName)

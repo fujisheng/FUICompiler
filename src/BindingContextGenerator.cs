@@ -64,10 +64,12 @@ namespace FUICompiler
 
                     if (property.type.isList)
                     {
-                        BuildListBinding(vmName, property, 
-                            ref bindingItemsBuilder, 
-                            ref unbindingItemsBuilder, 
-                            ref bingingFunctionsBuilder);
+                        var unbindingFunctionName = ListUnbindingFunctionNameTemplate
+                            .Replace(PropertyNameMark, property.name)
+                            .Replace(ViewModelNameMark, vmName)
+                            .Replace(PropertyTypeMark, property.type.ToTypeString());
+                        unbindingItemsBuilder.AppendLine($"{unbindingFunctionName}({vmName}.{property.name});");
+                        BuildListUnbindingFunction(vmName, property, ref bingingFunctionsBuilder);
                     }
                 }
 
@@ -124,6 +126,9 @@ namespace FUICompiler
             //构建值转换
             var convert = BuildConvert(bindingContext.type, property);
 
+            //如果这个属性是List则生成List绑定代码
+            var listBinding = property.type.isList ? ListBindingTemplate : string.Empty;
+
             //为属性生成对应的绑定方法
             var propertyChangedFunctionName = $"{vmName}_{property.name}_PropertyChanged";
             var elementUpdateValue = string.IsNullOrEmpty(property.elementPropertyName)
@@ -142,6 +147,7 @@ namespace FUICompiler
                 .Replace(ConvertMark, convert)
                 .Replace(ElementTypeMark, elementType)
                 .Replace(ElementPathMark, property.elementPath)
+                .Replace(ListBindingMark, listBinding)
                 .Replace(ElementUpdateValueMark, elementUpdateValue);
 
             //生成属性绑定代码
@@ -177,47 +183,21 @@ namespace FUICompiler
             return convertBuilder.ToString();
         }
 
-        //构建列表属性绑定
-        void BuildListBinding(string vmName, BindingProperty property,
-            ref StringBuilder bindingItemBuilder,
-            ref StringBuilder unbindingItemBuilder,
-            ref StringBuilder functionBuilder)
+        /// <summary>
+        /// 构建List绑定方法
+        /// </summary>
+        /// <param name="viewModelName">ViewModel名</param>
+        /// <param name="property">属性</param>
+        /// <param name="functionBuilder">方法构建器</param>
+        void BuildListUnbindingFunction(string viewModelName, BindingProperty property, ref StringBuilder functionBuilder)
         {
-            bindingItemBuilder.AppendLine($"{vmName}.{property.name}.CollectionAdd += OnList_{property.name}_Add;");
-            bindingItemBuilder.AppendLine($"{vmName}.{property.name}.CollectionRemove += OnList_{property.name}_Remove;");
-            bindingItemBuilder.AppendLine($"{vmName}.{property.name}.CollectionReplace += OnList_{property.name}_Replace;");
-            bindingItemBuilder.AppendLine($"{vmName}.{property.name}.CollectionUpdate += OnList_{property.name}_Update;");
-
-            unbindingItemBuilder.AppendLine($"{vmName}.{property.name}.CollectionAdd -= OnList_{property.name}_Add;");
-            unbindingItemBuilder.AppendLine($"{vmName}.{property.name}.CollectionRemove -= OnList_{property.name}_Remove;");
-            unbindingItemBuilder.AppendLine($"{vmName}.{property.name}.CollectionReplace -= OnList_{property.name}_Replace;");
-            unbindingItemBuilder.AppendLine($"{vmName}.{property.name}.CollectionUpdate -= OnList_{property.name}_Update;");
-
             var elementType = property.elementType.IsNull() ? string.Empty : $"<{property.elementType.ToTypeString()}>";
-            var baseTemplate = BindingListTemplate
+            functionBuilder.AppendLine(ListUnbindingFunctionTemplate
+                .Replace(ViewModelNameMark, viewModelName)
                 .Replace(PropertyNameMark, property.name)
+                .Replace(PropertyTypeMark, property.type.ToTypeString())
                 .Replace(ElementTypeMark, elementType)
-                .Replace(ElementPathMark, property.elementPath);
-
-            functionBuilder.AppendLine(baseTemplate
-                .Replace(OperatorMark, "Add")
-                .Replace(ListParamsMark, ListAddParams)
-                .Replace(OnOperateMark, OnListAdd));
-
-            functionBuilder.AppendLine(baseTemplate
-                .Replace(OperatorMark, "Remove")
-                .Replace(ListParamsMark, ListRemoveParams)
-                .Replace(OnOperateMark, OnListRemove));
-
-            functionBuilder.AppendLine(baseTemplate
-                .Replace(OperatorMark, "Replace")
-                .Replace(ListParamsMark, ListReplaceParams)
-                .Replace(OnOperateMark, OnListReplace));
-
-            functionBuilder.AppendLine(baseTemplate
-                .Replace(OperatorMark, "Update")
-                .Replace(ListParamsMark, ListUpdateParams)
-                .Replace(OnOperateMark, OnListUpdate));
+                .Replace(ElementPathMark, property.elementPath));
         }
 
         //构造所有的转换器构造代码

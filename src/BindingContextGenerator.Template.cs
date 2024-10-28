@@ -62,6 +62,7 @@ namespace *Namespace*
         const string ElementPathMark = "*ElementPath*";
         const string ElementUpdateValueMark = "*ElementUpdateValue*";
         const string ElementPropertyNameMark = "*ElementPropertyName*";
+        const string ListBindingMark = "*ListBinding*";
         const string BindingItemFunctionTemplate = @"
 void *PropertyChangedFunctionName*(object sender, *PropertyType* preValue, *PropertyType* @value)
 {
@@ -75,9 +76,31 @@ void *PropertyChangedFunctionName*(object sender, *PropertyType* preValue, *Prop
     {
         throw new System.Exception($""{this.View.Name} GetChild type:*ElementType* path:{@""*ElementPath*""} failed""); 
     }
+    *ListBinding*
     *ElementUpdateValue*
 }
 ";
+        const string ListBindingTemplate = @"
+    if(element is FUI.IListView listView)
+    {
+        if(preValue != null)
+        {
+            preValue.CollectionAdd -= listView.OnAdd;
+            preValue.CollectionRemove -= listView.OnRemove;
+            preValue.CollectionReplace -= listView.OnReplace;
+            preValue.CollectionUpdate -= listView.OnUpdate;
+        }
+        
+        if(@value != null)
+        {
+            @value.CollectionAdd += listView.OnAdd;
+            @value.CollectionRemove += listView.OnRemove;
+            @value.CollectionReplace += listView.OnReplace;
+            @value.CollectionUpdate += listView.OnUpdate;
+        }
+    }
+";
+
         const string ElementUpdateValue = "element.UpdateValue(convertedValue);";
         const string ElementPropertyUpdateValue = @"
     if(element is *ElementType* typedElement)
@@ -86,23 +109,15 @@ void *PropertyChangedFunctionName*(object sender, *PropertyType* preValue, *Prop
         typedElement.*ElementPropertyName*.SetValue(convertedValue, exception);
     }
 ";
-
-
-        const string ListAddParams = "(object sender, int? index, object item)";
-        const string ListRemoveParams = "(object sender, int? index, object item)";
-        const string ListReplaceParams = "(object sender, int? index, object oldItem, object newItem)";
-        const string ListUpdateParams = "(object sender)";
-        const string OnListAdd = "OnAdd(sender, index, item)";
-        const string OnListRemove = "OnRemove(sender, index, item)";
-        const string OnListReplace = "OnReplace(sender, index, oldItem, newItem)";
-        const string OnListUpdate = "OnUpdate(sender)";
-
-        const string OperatorMark = "*Operator*";
-        const string ListParamsMark = "*ListParams*";
-        const string OnOperateMark = "*OnOperate*";
-        const string BindingListTemplate = @"
-void OnList_*PropertyName*_*Operator**ListParams*
+        const string ListUnbindingFunctionNameTemplate = @"*ViewModelName*_UnbindingList_*PropertyName*";
+        const string ListUnbindingFunctionTemplate = @"
+void *ViewModelName*_UnbindingList_*PropertyName*(*PropertyType* list)
 {
+    if(list == null)
+    {
+        return;
+    }
+
     if(!(this.View is FUI.IElement e))
     {
         throw new System.Exception($""{this.View.Name} not FUI.IElement""); 
@@ -115,10 +130,14 @@ void OnList_*PropertyName*_*Operator**ListParams*
 
     if(element is FUI.IListView listView)
     {
-        listView.*OnOperate*;
+        list.CollectionAdd -= listView.OnAdd;
+        list.CollectionRemove -= listView.OnRemove;
+        list.CollectionReplace -= listView.OnReplace;
+        list.CollectionUpdate -= listView.OnUpdate;
     }
 }
 ";
+
 
         const string ElementNameMark = "*ElementName*";
         const string BindingV2VMTemplate = @"
