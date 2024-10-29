@@ -15,7 +15,7 @@ namespace FUICompiler
                 return;
             }
 
-            Console.WriteLine("inject property changed for " + typeDefinition.FullName);
+            //Console.WriteLine("inject property changed for " + typeDefinition.FullName);
             foreach (var property in typeDefinition.Properties)
             {
                 if (!Utility.IsObservableProperty(property) || property.SetMethod == null)

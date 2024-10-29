@@ -105,7 +105,7 @@ namespace FUICompiler
                     appendBuilder.AppendLine("}");
                 }
                 var code = Utility.NormalizeCode(appendBuilder.ToString());
-                Console.WriteLine($"generate property changed for {oldClass.Identifier.Text}");
+                //Console.WriteLine($"generate property changed for {oldClass.Identifier.Text}");
                 sources.Add(new Source($"{oldClass.Identifier.Text}.PropertyChanged", code));
                 return newClass;
             });

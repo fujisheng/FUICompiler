@@ -107,7 +107,7 @@ namespace FUICompiler
                 //格式化代码
                 code = Utility.NormalizeCode(code);
                 //Console.WriteLine(code);
-                Console.WriteLine($"generate data binding for {vmName}:{config.viewName}");
+                //Console.WriteLine($"generate data binding for {vmName}:{config.viewName}");
                 result.Add(new Source($"{vmName}_{config.viewName}.DataBinding", code));
             }
         }
@@ -131,9 +131,7 @@ namespace FUICompiler
 
             //为属性生成对应的绑定方法
             var propertyChangedFunctionName = $"{vmName}_{property.name}_PropertyChanged";
-            var elementUpdateValue = string.IsNullOrEmpty(property.elementPropertyName)
-                ? ElementUpdateValue
-                : ElementPropertyUpdateValue
+            var elementUpdateValue = ElementPropertyUpdateValue
                     .Replace(ElementTypeMark, property.elementType.ToTypeString())
                     .Replace(ElementPropertyNameMark, property.elementPropertyName)
                     .Replace(PropertyNameMark, property.name)

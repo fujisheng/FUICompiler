@@ -84,7 +84,7 @@ namespace FUICompiler
     {
         public List<ITypeSyntaxNodeSourcesGenerator> typeSyntaxRootGenerators = new List<ITypeSyntaxNodeSourcesGenerator>();
         public List<IBeforeCompilerSourcesGenerator> beforeCompilerSourcesGenerators = new List<IBeforeCompilerSourcesGenerator>();
-        public List<ITypeDefinationInjector> typeDefinationInjectors = new List<ITypeDefinationInjector>();
+        //public List<ITypeDefinationInjector> typeDefinationInjectors = new List<ITypeDefinationInjector>();
 
         /// <summary>
         /// 编译一个工程
@@ -95,15 +95,15 @@ namespace FUICompiler
         {
             if (MSBuildLocator.CanRegister)
             {
-                foreach (var msbuild in MSBuildLocator.QueryVisualStudioInstances())
-                {
-                    Console.WriteLine($"VisualStudioInstance: {msbuild.MSBuildPath}");
-                }
+                //foreach (var msbuild in MSBuildLocator.QueryVisualStudioInstances())
+                //{
+                //    Console.WriteLine($"VisualStudioInstance: {msbuild.MSBuildPath}");
+                //}
                 MSBuildLocator.RegisterInstance(MSBuildLocator.QueryVisualStudioInstances().First());
             }
 
             var workspace = MSBuildWorkspace.Create();
-            Console.WriteLine($"Loading solution {param.solutionPath}");
+            //Console.WriteLine($"Loading solution {param.solutionPath}");
             var solution = await workspace.OpenSolutionAsync(param.solutionPath);
             var project = solution.Projects.FirstOrDefault(item => item.Name == param.projectName);
 
@@ -121,25 +121,38 @@ namespace FUICompiler
             //编译前源代码生成器
             GenerateBeforeCompiler(addition);
 
+            //保存生成的代码文件
+            SaveGenerated(addition, param.generatedPath);
+
             //将生成的代码添加到工程中
             foreach (var add in addition)
             {
-                project = project.AddDocument(add.name, CSharpSyntaxTree.ParseText(add.Text).GetRoot()).Project; 
+                var filePath = string.IsNullOrEmpty(param.generatedPath) ? null : $"{param.generatedPath}\\{add.name}.cs";
+                project = project.AddDocument(add.name, CSharpSyntaxTree.ParseText(add.Text).GetRoot(), filePath: Path.GetFullPath(filePath)).Project; 
             }
 
             //编译工程
             var asm = await InternalBuild(project);
 
-            //根据类型定义注入代码
-            InjectByTypeDefination(asm);
+            //编译失败
+            if(asm == null)
+            {
+                Message.Message.WriteMessage(Message.MessageType.Log, new Message.LogMessage
+                {
+                    Level = Message.LogLevel.Error,
+                    Message = $"compiler error"
+                });
+                return;
+            }
 
-            //输最终的dll
+            //编译成功 输出最终的dll
             asm.Write(param.output);
 
-            //保存生成的代码文件
-            SaveGenerated(addition, param.generatedPath);
-
-            Console.WriteLine($"compiler complete at:{param.output}");
+            Message.Message.WriteMessage(Message.MessageType.Log, new Message.LogMessage
+            {
+                Level = Message.LogLevel.Info,
+                Message = $"compiler complete at:{param.output}"
+            });
         }
 
         /// <summary>
@@ -159,12 +172,14 @@ namespace FUICompiler
                 diagnostic.IsWarningAsError ||
                 diagnostic.Severity == DiagnosticSeverity.Error);
 
-                var errors = string.Empty;  
                 foreach (Diagnostic diagnostic in failures)
                 {
-                    errors += $"{diagnostic.Id}:{diagnostic.GetMessage()}\n";
+                    Message.Message.WriteMessage(Message.MessageType.Compiler, new Message.CompilerMessage
+                    {
+                        Error = diagnostic.ToString()
+                    });
                 }
-                throw new Exception(errors);
+                return null;
             }
 
             ms.Seek(0, SeekOrigin.Begin);
@@ -249,16 +264,16 @@ namespace FUICompiler
         void InjectByTypeDefination(AssemblyDefinition asm)
         {
             //注入IL
-            foreach (var injector in typeDefinationInjectors)
-            {
-                foreach (var module in asm.Modules)
-                {
-                    foreach (var type in module.Types)
-                    {
-                        injector.Inject(module, type);
-                    }
-                }
-            }
+            //foreach (var injector in typeDefinationInjectors)
+            //{
+            //    foreach (var module in asm.Modules)
+            //    {
+            //        foreach (var type in module.Types)
+            //        {
+            //            injector.Inject(module, type);
+            //        }
+            //    }
+            //}
         }
 
         /// <summary>

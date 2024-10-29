@@ -5,6 +5,7 @@
     /// </summary>
     public partial class BindingContextGenerator
     {
+        #region 类模板
         const string ViewNameMark = "*ViewName*";
         const string BindingMark = "*Binding*";
         const string UnbindingMark = "*Unbinding*";
@@ -43,7 +44,9 @@ namespace *Namespace*
     }
 }
 ";
+        #endregion
 
+        #region 绑定方法模板
         const string BindingItemsMark = "*BindingItems*";
         const string BindingTemplate = @"
             if(this.ViewModel is *ViewModelType* *ViewModelName*)
@@ -52,8 +55,10 @@ namespace *Namespace*
                 return;
             }
 ";
+        #endregion
 
- 
+
+        #region 属性绑定模板
         const string PropertyNameMark = "*PropertyName*";
         const string PropertyTypeMark = "*PropertyType*";
         const string PropertyChangedFunctionNameMark = "*PropertyChangedFunctionName*";
@@ -63,6 +68,8 @@ namespace *Namespace*
         const string ElementUpdateValueMark = "*ElementUpdateValue*";
         const string ElementPropertyNameMark = "*ElementPropertyName*";
         const string ListBindingMark = "*ListBinding*";
+
+        //属性绑定方法模板
         const string BindingItemFunctionTemplate = @"
 void *PropertyChangedFunctionName*(object sender, *PropertyType* preValue, *PropertyType* @value)
 {
@@ -80,6 +87,7 @@ void *PropertyChangedFunctionName*(object sender, *PropertyType* preValue, *Prop
     *ElementUpdateValue*
 }
 ";
+        //ListView绑定模板
         const string ListBindingTemplate = @"
     if(element is FUI.IListView listView)
     {
@@ -101,7 +109,8 @@ void *PropertyChangedFunctionName*(object sender, *PropertyType* preValue, *Prop
     }
 ";
 
-        const string ElementUpdateValue = "element.UpdateValue(convertedValue);";
+
+        //Element属性更新模板
         const string ElementPropertyUpdateValue = @"
     if(element is *ElementType* typedElement)
     {
@@ -110,6 +119,7 @@ void *PropertyChangedFunctionName*(object sender, *PropertyType* preValue, *Prop
     }
 ";
         const string ListUnbindingFunctionNameTemplate = @"*ViewModelName*_UnbindingList_*PropertyName*";
+        //ListView解绑方法模板
         const string ListUnbindingFunctionTemplate = @"
 void *ViewModelName*_UnbindingList_*PropertyName*(*PropertyType* list)
 {
@@ -137,6 +147,7 @@ void *ViewModelName*_UnbindingList_*PropertyName*(*PropertyType* list)
     }
 }
 ";
+        #endregion
 
 
         const string ElementNameMark = "*ElementName*";

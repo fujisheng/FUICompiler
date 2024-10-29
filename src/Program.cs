@@ -1,5 +1,4 @@
-﻿// See https://aka.ms/new-console-template for more information
-using FUICompiler;
+﻿using FUICompiler;
 
 const string slnMark = "--sln";
 const string projectMark = "--project";
@@ -28,7 +27,13 @@ compiler.typeSyntaxRootGenerators.Add(new ObservableObjectAppendGenerator());
 //compiler.typeDefinationInjectors.Add(new PropertyChangedInjector());
 
 
-Console.WriteLine($"start build sln:{param.solutionPath} project:{param.projectName} output:{param.output} binding:{param.bindingPath} context_generate_type:{param.contextGenerateType}");
+//Console.WriteLine(@$"
+//start build
+//sln:{Path.GetFullPath(param.solutionPath)}
+//project:{param.projectName}
+//output:{Path.GetFullPath(param.output)}
+//binding:{Path.GetFullPath(param.bindingPath)}
+//context_generate_type:{param.contextGenerateType}");
 await compiler.Build(param);
 
 BuildParam ParseArgs(string[] args)
