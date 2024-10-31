@@ -151,20 +151,31 @@ void *ViewModelName*_UnbindingList_*PropertyName*(*PropertyType* list)
 
 
         const string ElementNameMark = "*ElementName*";
-        const string BindingV2VMTemplate = @"
-void *Operator*Element_*ElementName*()
+        const string V2VMBindingFunctionTemplate = @"
+void *ViewModelType*_*PropertyName*_*Operator*_V2VM(*ViewModelType* *ViewModelName*)
 {
-    var element = this.View.GetVisualElement*ElementType*(""*ElementPath*"");
+    if(!(this.View is FUI.IElement e))
+    {
+        throw new System.Exception($""{this.View.Name} not FUI.IElement""); 
+    }
+    var element = e.GetChild*ElementType*(""*ElementPath*"");
     if(element == null)
     {
-        throw new System.Exception($""{this.View.Name} GetVisualElement type:*ElementType* path:{@""*ElementPath*""} failed""); 
+        throw new System.Exception($""{this.View.Name} GetChild type:*ElementType* path:{@""*ElementPath*""} failed""); 
     }
 
-    if(element is FUI.IObservableVisualElement)
+    if(element is *ElementType* typedElement)
     {
-        element.OnValueChanged += ;
+        var exception = $""Cannot convert the property *ViewModelType*.*PropertyName*(*PropertyType*) to the property *ElementType*.*ElementPropertyName*({typedElement.*ElementPropertyName*.GetType()}), please consider using Convertor for this binding..."";
+        var elementValue = typedElement.*ElementPropertyName*.OnValueChanged *OperatorString* *ViewModelType*_*PropertyName*_SetValue;
     }
 }          
+";
+        const string ViewModelPropertySetValueTemplate = @"
+void *ViewModelType*_*PropertyName*_SetValue(*ViewModelType* *ViewModelName*, *PropertyType* value)
+{
+    *ViewModelName*._*PropertyName*_BackingField = value;
+}
 ";
     }
 }

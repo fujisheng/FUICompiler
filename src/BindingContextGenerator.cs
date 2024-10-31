@@ -237,19 +237,16 @@ namespace FUICompiler
             ref StringBuilder unbindingItemBuilder,
             ref StringBuilder functionBuilder)
         {
-            var elementType = property.elementType.IsNull() ? string.Empty : $"<{property.elementType.ToTypeString()}>";
-            var elementName = GetFormatName(property.elementPath);
-            bindingItemBuilder.AppendLine($"var @{elementName} = this.View.GetVisualElement{elementType}(\"{property.elementPath}\")");
-            bindingItemBuilder.AppendLine($"if(@{elementName} is FUI.IObservableVisualElement)");
-            bindingItemBuilder.AppendLine("{");
-            bindingItemBuilder.AppendLine($"@{elementName}.OnValueChanged += OnElement_{elementName}_ValueChanged;");
-            bindingItemBuilder.AppendLine("}");
+            bindingItemBuilder.AppendLine($"{vmName}_{property.name}_Binding_V2VM({vmName});");
+            unbindingItemBuilder.AppendLine($"{vmName}_{property.name}_Unbinding_V2VM({vmName});");
 
-            unbindingItemBuilder.AppendLine($"var @{elementName} = this.View.GetVisualElement{elementType}(\"{property.elementPath}\")");
-            unbindingItemBuilder.AppendLine($"if(@{elementName} is FUI.IObservableVisualElement)");
-            unbindingItemBuilder.AppendLine("{");
-            unbindingItemBuilder.AppendLine($"@{elementName}.OnValueChanged -= OnElement_{elementName}_ValueChanged;");
-            unbindingItemBuilder.AppendLine("}");
+            functionBuilder.AppendLine(V2VMBindingFunctionTemplate
+                .Replace(ViewModelTypeMark, vmName)
+                .Replace(PropertyNameMark, property.name)
+                .Replace(ViewModelNameMark, vmName)
+                .Replace(PropertyTypeMark, property.type.ToTypeString())
+                .Replace(ElementTypeMark, property.elementType.ToTypeString())
+                .Replace(ElementPathMark, property.elementPath));
         }
 
         string GetFormatName(string path)
