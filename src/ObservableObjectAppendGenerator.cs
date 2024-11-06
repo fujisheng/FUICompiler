@@ -76,7 +76,7 @@ namespace FUICompiler
 
                     //生成BackingField
                     var fieldName = Utility.GetPropertyBackingFieldName(propertyName);
-                    appendBuilder.AppendLine($"{propertyType} {fieldName} {property.Initializer};");
+                    appendBuilder.AppendLine($"public {propertyType} {fieldName} {property.Initializer};");
 
                     //生成对应的委托
                     string delegateType = $"FUI.Bindable.PropertyChangedHandler<{propertyType}>";

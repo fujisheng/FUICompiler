@@ -71,6 +71,11 @@ namespace FUICompiler
                         unbindingItemsBuilder.AppendLine($"{unbindingFunctionName}({vmName}.{property.name});");
                         BuildListUnbindingFunction(vmName, property, ref bingingFunctionsBuilder);
                     }
+
+                    if(property.bindingType == BindingType.TwoWay)
+                    {
+                        BuildV2VMBinding(vmName, property, ref bindingItemsBuilder, ref unbindingItemsBuilder, ref bingingFunctionsBuilder);
+                    }
                 }
 
                 //组装绑定代码
@@ -240,13 +245,31 @@ namespace FUICompiler
             bindingItemBuilder.AppendLine($"{vmName}_{property.name}_Binding_V2VM({vmName});");
             unbindingItemBuilder.AppendLine($"{vmName}_{property.name}_Unbinding_V2VM({vmName});");
 
-            functionBuilder.AppendLine(V2VMBindingFunctionTemplate
+            var tempBuilder = new StringBuilder();
+            tempBuilder.AppendLine(V2VMBindingFunctionTemplate
                 .Replace(ViewModelTypeMark, vmName)
                 .Replace(PropertyNameMark, property.name)
                 .Replace(ViewModelNameMark, vmName)
                 .Replace(PropertyTypeMark, property.type.ToTypeString())
                 .Replace(ElementTypeMark, property.elementType.ToTypeString())
-                .Replace(ElementPathMark, property.elementPath));
+                .Replace(ElementPathMark, property.elementPath)
+                .Replace(ElementPropertyNameMark, property.elementPropertyName));
+
+            var temp = tempBuilder.ToString();
+
+            functionBuilder.AppendLine(temp
+                .Replace(OperatorMark, BindingOperator)
+                .Replace(OperatorStringMark, BindingOperatorString));
+
+            functionBuilder.AppendLine(temp
+                .Replace(OperatorMark, UnbindingOperator)
+                .Replace(OperatorStringMark, UnbindingOperatorString));
+
+            functionBuilder.AppendLine(ViewModelPropertySetValueTemplate
+                .Replace(ViewModelTypeMark, vmName)
+                .Replace(PropertyNameMark, property.name)
+                .Replace(ViewModelNameMark, vmName)
+                .Replace(PropertyTypeMark, property.type.ToTypeString()));
         }
 
         string GetFormatName(string path)

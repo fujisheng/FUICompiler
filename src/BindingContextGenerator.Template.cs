@@ -149,8 +149,12 @@ void *ViewModelName*_UnbindingList_*PropertyName*(*PropertyType* list)
 ";
         #endregion
 
-
-        const string ElementNameMark = "*ElementName*";
+        const string OperatorMark = "*Operator*";
+        const string OperatorStringMark = "*OperatorString*";
+        const string BindingOperator = "Binding";
+        const string UnbindingOperator = "Unbinding";
+        const string BindingOperatorString = "+=";
+        const string UnbindingOperatorString = "-=";
         const string V2VMBindingFunctionTemplate = @"
 void *ViewModelType*_*PropertyName*_*Operator*_V2VM(*ViewModelType* *ViewModelName*)
 {
@@ -158,7 +162,7 @@ void *ViewModelType*_*PropertyName*_*Operator*_V2VM(*ViewModelType* *ViewModelNa
     {
         throw new System.Exception($""{this.View.Name} not FUI.IElement""); 
     }
-    var element = e.GetChild*ElementType*(""*ElementPath*"");
+    var element = e.GetChild<*ElementType*>(""*ElementPath*"");
     if(element == null)
     {
         throw new System.Exception($""{this.View.Name} GetChild type:*ElementType* path:{@""*ElementPath*""} failed""); 
@@ -167,14 +171,17 @@ void *ViewModelType*_*PropertyName*_*Operator*_V2VM(*ViewModelType* *ViewModelNa
     if(element is *ElementType* typedElement)
     {
         var exception = $""Cannot convert the property *ViewModelType*.*PropertyName*(*PropertyType*) to the property *ElementType*.*ElementPropertyName*({typedElement.*ElementPropertyName*.GetType()}), please consider using Convertor for this binding..."";
-        var elementValue = typedElement.*ElementPropertyName*.OnValueChanged *OperatorString* *ViewModelType*_*PropertyName*_SetValue;
+        typedElement.*ElementPropertyName*.OnValueChanged *OperatorString* *ViewModelType*_*PropertyName*_SetValue;
     }
 }          
 ";
         const string ViewModelPropertySetValueTemplate = @"
-void *ViewModelType*_*PropertyName*_SetValue(*ViewModelType* *ViewModelName*, *PropertyType* value)
+void *ViewModelType*_*PropertyName*_SetValue(*PropertyType* oldValue, *PropertyType* newValue)
 {
-    *ViewModelName*._*PropertyName*_BackingField = value;
+    if(this.ViewModel is *ViewModelType* *ViewModelName*)
+    {
+        *ViewModelName*._*PropertyName*_BackingField = newValue;
+    }
 }
 ";
     }
