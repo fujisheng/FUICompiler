@@ -118,10 +118,10 @@ void *PropertyChangedFunctionName*(object sender, *PropertyType* preValue, *Prop
         typedElement.*ElementPropertyName*.SetValue(convertedValue, exception);
     }
 ";
-        const string ListUnbindingFunctionNameTemplate = @"*ViewModelName*_UnbindingList_*PropertyName*";
+        const string ListUnbindingFunctionNameMark = @"*ListUnbindingFunctionName*";
         //ListView解绑方法模板
         const string ListUnbindingFunctionTemplate = @"
-void *ViewModelName*_UnbindingList_*PropertyName*(*PropertyType* list)
+void *ListUnbindingFunctionName*(*PropertyType* list)
 {
     if(list == null)
     {
@@ -149,14 +149,14 @@ void *ViewModelName*_UnbindingList_*PropertyName*(*PropertyType* list)
 ";
         #endregion
 
-        const string OperatorMark = "*Operator*";
-        const string OperatorStringMark = "*OperatorString*";
-        const string BindingOperator = "Binding";
-        const string UnbindingOperator = "Unbinding";
-        const string BindingOperatorString = "+=";
-        const string UnbindingOperatorString = "-=";
+        #region View到ViewModel绑定模板
+        const string V2VMOperateMark = "*V2VMOperate*";
+        const string InvocationMark = "*Invocation*";
+        const string V2VMBindingFunctionNameMark = "*V2VMBindingFunctionName*";
+        const string V2VMBindingInvocationNameMark = "*V2VMBindingInvocationName*";
         const string V2VMBindingFunctionTemplate = @"
-void *ViewModelType*_*PropertyName*_*Operator*_V2VM(*ViewModelType* *ViewModelName*)
+*Invocation*
+void *V2VMBindingFunctionName*(*ViewModelType* *ViewModelName*)
 {
     if(!(this.View is FUI.IElement e))
     {
@@ -171,18 +171,22 @@ void *ViewModelType*_*PropertyName*_*Operator*_V2VM(*ViewModelType* *ViewModelNa
     if(element is *ElementType* typedElement)
     {
         var exception = $""Cannot convert the property *ViewModelType*.*PropertyName*(*PropertyType*) to the property *ElementType*.*ElementPropertyName*({typedElement.*ElementPropertyName*.GetType()}), please consider using Convertor for this binding..."";
-        typedElement.*ElementPropertyName*.OnValueChanged *OperatorString* *ViewModelType*_*PropertyName*_SetValue;
+        *V2VMOperate*
     }
 }          
 ";
-        const string ViewModelPropertySetValueTemplate = @"
-void *ViewModelType*_*PropertyName*_SetValue(*PropertyType* oldValue, *PropertyType* newValue)
-{
-    if(this.ViewModel is *ViewModelType* *ViewModelName*)
-    {
-        *ViewModelName*._*PropertyName*_BackingField = newValue;
-    }
-}
+        const string V2VMBindingTemplate = @"
+typedElement.*ElementPropertyName*.OnValueChanged += (oldValue, newValue)=>
+{   
+    typedElement.*ElementPropertyName*.MuteValueChangedEvent(true);
+    *ViewModelName*.*PropertyName* = newValue;
+    typedElement.*ElementPropertyName*.MuteValueChangedEvent(false);
+};
+*V2VMBindingInvocationName* = typedElement.*ElementPropertyName*.GetLastInvocation();
 ";
+        const string V2VMUnbindingTemplate = @"
+typedElement.*ElementPropertyName*.RemoveValueChanged(*V2VMBindingInvocationName*);
+";
+        #endregion
     }
 }

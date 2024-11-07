@@ -64,12 +64,9 @@ namespace FUICompiler
 
                     if (property.type.isList)
                     {
-                        var unbindingFunctionName = ListUnbindingFunctionNameTemplate
-                            .Replace(PropertyNameMark, property.name)
-                            .Replace(ViewModelNameMark, vmName)
-                            .Replace(PropertyTypeMark, property.type.ToTypeString());
+                        var unbindingFunctionName = $"{vmName}_UnbindingList_{property.name}_{property.elementPath.ToCSharpName()}_{property.elementType.ToTypeString().ToCSharpName()}";
                         unbindingItemsBuilder.AppendLine($"{unbindingFunctionName}({vmName}.{property.name});");
-                        BuildListUnbindingFunction(vmName, property, ref bingingFunctionsBuilder);
+                        BuildListUnbindingFunction(vmName, unbindingFunctionName, property, ref bingingFunctionsBuilder);
                     }
 
                     if(property.bindingType == BindingType.TwoWay)
@@ -135,7 +132,7 @@ namespace FUICompiler
             var listBinding = property.type.isList ? ListBindingTemplate : string.Empty;
 
             //为属性生成对应的绑定方法
-            var propertyChangedFunctionName = $"{vmName}_{property.name}_PropertyChanged";
+            var propertyChangedFunctionName = $"{vmName}_{property.name}_PropertyChanged_{Utility.ToCSharpName(property.elementPath)}_{Utility.ToCSharpName(property.elementType.ToTypeString())}";
             var elementUpdateValue = ElementPropertyUpdateValue
                     .Replace(ElementTypeMark, property.elementType.ToTypeString())
                     .Replace(ElementPropertyNameMark, property.elementPropertyName)
@@ -192,10 +189,11 @@ namespace FUICompiler
         /// <param name="viewModelName">ViewModel名</param>
         /// <param name="property">属性</param>
         /// <param name="functionBuilder">方法构建器</param>
-        void BuildListUnbindingFunction(string viewModelName, BindingProperty property, ref StringBuilder functionBuilder)
+        void BuildListUnbindingFunction(string viewModelName, string functionName, BindingProperty property, ref StringBuilder functionBuilder)
         {
             var elementType = property.elementType.IsNull() ? string.Empty : $"<{property.elementType.ToTypeString()}>";
             functionBuilder.AppendLine(ListUnbindingFunctionTemplate
+                .Replace(ListUnbindingFunctionNameMark, functionName)
                 .Replace(ViewModelNameMark, viewModelName)
                 .Replace(PropertyNameMark, property.name)
                 .Replace(PropertyTypeMark, property.type.ToTypeString())
@@ -242,10 +240,17 @@ namespace FUICompiler
             ref StringBuilder unbindingItemBuilder,
             ref StringBuilder functionBuilder)
         {
-            bindingItemBuilder.AppendLine($"{vmName}_{property.name}_Binding_V2VM({vmName});");
-            unbindingItemBuilder.AppendLine($"{vmName}_{property.name}_Unbinding_V2VM({vmName});");
+            var bindingFunctionName = $"{vmName}_{property.name}_BindingV2VM_{property.elementPath.ToCSharpName()}_{property.elementType.ToTypeString().ToCSharpName()}";
+            var unbindingFunctionName = $"{vmName}_{property.name}_UnbindingV2VM_{property.elementPath.ToCSharpName()}_{property.elementType.ToTypeString().ToCSharpName()}";
+            bindingItemBuilder.AppendLine($"{bindingFunctionName}({vmName});");
+            unbindingItemBuilder.AppendLine($"{unbindingFunctionName}({vmName});");
+
+            var invocationName = $"{vmName}_{property.name}_V2VM_{property.elementPath.ToCSharpName()}_{property.elementType.ToTypeString().ToCSharpName()}_Invocation";
+
+            var invocation = $"System.Delegate {invocationName};";
 
             var tempBuilder = new StringBuilder();
+            
             tempBuilder.AppendLine(V2VMBindingFunctionTemplate
                 .Replace(ViewModelTypeMark, vmName)
                 .Replace(PropertyNameMark, property.name)
@@ -257,19 +262,25 @@ namespace FUICompiler
 
             var temp = tempBuilder.ToString();
 
-            functionBuilder.AppendLine(temp
-                .Replace(OperatorMark, BindingOperator)
-                .Replace(OperatorStringMark, BindingOperatorString));
-
-            functionBuilder.AppendLine(temp
-                .Replace(OperatorMark, UnbindingOperator)
-                .Replace(OperatorStringMark, UnbindingOperatorString));
-
-            functionBuilder.AppendLine(ViewModelPropertySetValueTemplate
-                .Replace(ViewModelTypeMark, vmName)
-                .Replace(PropertyNameMark, property.name)
+            var bindingOperate = V2VMBindingTemplate
+                .Replace(ElementPropertyNameMark, property.elementPropertyName)
                 .Replace(ViewModelNameMark, vmName)
-                .Replace(PropertyTypeMark, property.type.ToTypeString()));
+                .Replace(PropertyNameMark, property.name)
+                .Replace(V2VMBindingInvocationNameMark, invocationName);
+
+            functionBuilder.AppendLine(temp
+                .Replace(InvocationMark, invocation)
+                .Replace(V2VMBindingFunctionNameMark, bindingFunctionName)
+                .Replace(V2VMOperateMark, bindingOperate));
+
+            var unbindingOperate = V2VMUnbindingTemplate
+                .Replace(ElementPropertyNameMark, property.elementPropertyName)
+                .Replace(V2VMBindingInvocationNameMark, invocationName);
+            functionBuilder.AppendLine(temp
+                .Replace(InvocationMark, "")
+                .Replace(V2VMBindingFunctionNameMark, unbindingFunctionName)
+                .Replace(V2VMOperateMark, unbindingOperate));
+
         }
 
         string GetFormatName(string path)

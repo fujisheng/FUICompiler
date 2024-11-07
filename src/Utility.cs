@@ -86,6 +86,28 @@ namespace FUICompiler
         }
 
         /// <summary>
+        /// 将一个字符串转换成合法的C#名字
+        /// </summary>
+        /// <param name="str"></param>
+        /// <returns></returns>
+        public static string ToCSharpName(this string str)
+        {
+            return str.Replace("<", "_")
+                .Replace(">", "_")
+                .Replace(".", "_")
+                .Replace("/", "_")
+                .Replace("\\", "_")
+                .Replace(":", "_")
+                .Replace(";", "_")
+                .Replace(" ", "")
+                .Replace("'", "_")
+                .Replace("@", "")
+                .Replace("&", "")
+                .Replace("(", "")
+                .Replace(")", "");
+        }
+
+        /// <summary>
         /// 格式化代码
         /// </summary>
         /// <param name="text">代码</param>
