@@ -62,13 +62,17 @@ namespace FUICompiler
                             ref bindingItemsBuilder, //属性对应的绑定代码
                             ref unbindingItemsBuilder);//属性对应的解绑代码
 
+                    //如果是列表 需要单独构建ListUnbinding代码
                     if (property.type.isList)
                     {
-                        var unbindingFunctionName = $"{vmName}_UnbindingList_{property.name}_{property.elementPath.ToCSharpName()}_{property.elementType.ToTypeString().ToCSharpName()}";
-                        unbindingItemsBuilder.AppendLine($"{unbindingFunctionName}({vmName}.{property.name});");
-                        BuildListUnbindingFunction(vmName, unbindingFunctionName, property, ref bingingFunctionsBuilder);
+                        unbindingItemsBuilder.AppendLine(ListUnbindingTemplate
+                            .Replace(ElementTypeMark, property.elementType.ToTypeString())
+                            .Replace(ViewModelNameMark, vmName)
+                            .Replace(PropertyNameMark, property.name)
+                            .Replace(ElementPathMark, property.elementPath));
                     }
 
+                    //如果是双向绑定需要构建从View到ViewModel的绑定
                     if(property.bindingType == BindingType.TwoWay)
                     {
                         BuildV2VMBinding(vmName, property, ref bindingItemsBuilder, ref unbindingItemsBuilder, ref bingingFunctionsBuilder);
@@ -133,6 +137,8 @@ namespace FUICompiler
 
             //为属性生成对应的绑定方法
             var propertyChangedFunctionName = $"{vmName}_{property.name}_PropertyChanged_{Utility.ToCSharpName(property.elementPath)}_{Utility.ToCSharpName(property.elementType.ToTypeString())}";
+
+            //元素值更新代码生成
             var elementUpdateValue = ElementPropertyUpdateValue
                     .Replace(ElementTypeMark, property.elementType.ToTypeString())
                     .Replace(ElementPropertyNameMark, property.elementPropertyName)
@@ -140,12 +146,12 @@ namespace FUICompiler
                     .Replace(PropertyTypeMark, property.type.ToTypeString())
                     .Replace(ViewModelTypeMark, vmName);
 
-            var elementType = property.elementType.IsNull() ? string.Empty : $"<{property.elementType.ToTypeString()}>";
+            //构建属性绑定代码
             bindingFunctionBuilder.AppendLine(BindingItemFunctionTemplate.Replace(PropertyChangedFunctionNameMark, propertyChangedFunctionName)
                 .Replace(PropertyNameMark, property.name))
                 .Replace(PropertyTypeMark, property.type.ToTypeString())
                 .Replace(ConvertMark, convert)
-                .Replace(ElementTypeMark, elementType)
+                .Replace(ElementTypeMark, property.elementType.ToTypeString())
                 .Replace(ElementPathMark, property.elementPath)
                 .Replace(ListBindingMark, listBinding)
                 .Replace(ElementUpdateValueMark, elementUpdateValue);
@@ -156,8 +162,6 @@ namespace FUICompiler
             //生成属性解绑代码
             unbindingItemsBuilder.AppendLine($"{vmName}.{delegateName} -= {propertyChangedFunctionName};");
 
-            //Console.WriteLine(bindingFunctionBuilder.ToString());
-
             converterTypes.Add(property.converterType.ToTypeString());
         }
 
@@ -167,38 +171,16 @@ namespace FUICompiler
         string BuildConvert(string viewModelType, BindingProperty property)
         {
             var convertBuilder = new StringBuilder();
-            //convertBuilder.AppendLine($"{property.elementValueType.ToTypeString()} convertedValue;");
+
             if (!property.converterType.IsNull())
             {
-                //convertBuilder.AppendLine($"var input = ({property.converterValueType.ToTypeString()})@value;");
-                //convertBuilder.AppendLine($"var convertedTempValue = {GetFormattedType(property.converterType.ToTypeString())}.Convert(input);");
-                //convertBuilder.AppendLine($"convertedValue = ({property.elementValueType.ToTypeString()})convertedTempValue;");
                 convertBuilder.AppendLine($"var convertedValue = {GetFormattedType(property.converterType.ToTypeString())}.Convert(@value);");
             }
             else
             {
                 convertBuilder.AppendLine($"var convertedValue = @value;");
-                //convertBuilder.AppendLine($"convertedValue = ({property.elementValueType.ToTypeString()})@value;");
             }
             return convertBuilder.ToString();
-        }
-
-        /// <summary>
-        /// 构建List绑定方法
-        /// </summary>
-        /// <param name="viewModelName">ViewModel名</param>
-        /// <param name="property">属性</param>
-        /// <param name="functionBuilder">方法构建器</param>
-        void BuildListUnbindingFunction(string viewModelName, string functionName, BindingProperty property, ref StringBuilder functionBuilder)
-        {
-            var elementType = property.elementType.IsNull() ? string.Empty : $"<{property.elementType.ToTypeString()}>";
-            functionBuilder.AppendLine(ListUnbindingFunctionTemplate
-                .Replace(ListUnbindingFunctionNameMark, functionName)
-                .Replace(ViewModelNameMark, viewModelName)
-                .Replace(PropertyNameMark, property.name)
-                .Replace(PropertyTypeMark, property.type.ToTypeString())
-                .Replace(ElementTypeMark, elementType)
-                .Replace(ElementPathMark, property.elementPath));
         }
 
         //构造所有的转换器构造代码

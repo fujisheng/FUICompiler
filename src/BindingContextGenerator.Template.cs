@@ -74,41 +74,15 @@ namespace *Namespace*
 void *PropertyChangedFunctionName*(object sender, *PropertyType* preValue, *PropertyType* @value)
 {
     *Convert*
-    if(!(this.View is FUI.IElement e))
-    {
-        throw new System.Exception($""{this.View.Name} not FUI.IElement""); 
-    }
-    var element = e.GetChild*ElementType*(""*ElementPath*"");
-    if(element == null)
-    {
-        throw new System.Exception($""{this.View.Name} GetChild type:*ElementType* path:{@""*ElementPath*""} failed""); 
-    }
+    var element = FUI.Extensions.ViewExtensions.GetElement<*ElementType*>(this.View, ""*ElementPath*"");
     *ListBinding*
     *ElementUpdateValue*
 }
 ";
         //ListView绑定模板
         const string ListBindingTemplate = @"
-    if(element is FUI.IListView listView)
-    {
-        if(preValue != null)
-        {
-            preValue.CollectionAdd -= listView.OnAdd;
-            preValue.CollectionRemove -= listView.OnRemove;
-            preValue.CollectionReplace -= listView.OnReplace;
-            preValue.CollectionUpdate -= listView.OnUpdate;
-        }
-        
-        if(@value != null)
-        {
-            @value.CollectionAdd += listView.OnAdd;
-            @value.CollectionRemove += listView.OnRemove;
-            @value.CollectionReplace += listView.OnReplace;
-            @value.CollectionUpdate += listView.OnUpdate;
-        }
-    }
+FUI.Extensions.BindingContextExtensions.BindingList(element, preValue, @value);
 ";
-
 
         //Element属性更新模板
         const string ElementPropertyUpdateValue = @"
@@ -118,34 +92,10 @@ void *PropertyChangedFunctionName*(object sender, *PropertyType* preValue, *Prop
         typedElement.*ElementPropertyName*.SetValue(convertedValue, exception);
     }
 ";
-        const string ListUnbindingFunctionNameMark = @"*ListUnbindingFunctionName*";
-        //ListView解绑方法模板
-        const string ListUnbindingFunctionTemplate = @"
-void *ListUnbindingFunctionName*(*PropertyType* list)
-{
-    if(list == null)
-    {
-        return;
-    }
 
-    if(!(this.View is FUI.IElement e))
-    {
-        throw new System.Exception($""{this.View.Name} not FUI.IElement""); 
-    }
-    var element = e.GetChild*ElementType*(""*ElementPath*"");
-    if(element == null)
-    {
-        throw new System.Exception($""{this.View.Name} GetChild type:*ElementType* path:{@""*ElementPath*""} failed""); 
-    }
-
-    if(element is FUI.IListView listView)
-    {
-        list.CollectionAdd -= listView.OnAdd;
-        list.CollectionRemove -= listView.OnRemove;
-        list.CollectionReplace -= listView.OnReplace;
-        list.CollectionUpdate -= listView.OnUpdate;
-    }
-}
+        //ListView解绑模板
+        const string ListUnbindingTemplate = @"
+FUI.Extensions.BindingContextExtensions.UnbindingList<*ElementType*>(this, *ViewModelName*.*PropertyName*, ""*ElementPath*"");
 ";
         #endregion
 
@@ -158,34 +108,23 @@ void *ListUnbindingFunctionName*(*PropertyType* list)
 *Invocation*
 void *V2VMBindingFunctionName*(*ViewModelType* *ViewModelName*)
 {
-    if(!(this.View is FUI.IElement e))
-    {
-        throw new System.Exception($""{this.View.Name} not FUI.IElement""); 
-    }
-    var element = e.GetChild<*ElementType*>(""*ElementPath*"");
-    if(element == null)
-    {
-        throw new System.Exception($""{this.View.Name} GetChild type:*ElementType* path:{@""*ElementPath*""} failed""); 
-    }
+    var element = FUI.Extensions.ViewExtensions.GetElement<*ElementType*>(this.View, ""*ElementPath*"");
 
-    if(element is *ElementType* typedElement)
-    {
-        var exception = $""Cannot convert the property *ViewModelType*.*PropertyName*(*PropertyType*) to the property *ElementType*.*ElementPropertyName*({typedElement.*ElementPropertyName*.GetType()}), please consider using Convertor for this binding..."";
+    var exception = $""Cannot convert the property *ViewModelType*.*PropertyName*(*PropertyType*) to the property *ElementType*.*ElementPropertyName*({element.*ElementPropertyName*.GetType()}), please consider using Convertor for this binding..."";
         *V2VMOperate*
-    }
 }          
 ";
         const string V2VMBindingTemplate = @"
-typedElement.*ElementPropertyName*.OnValueChanged += (oldValue, newValue)=>
+element.*ElementPropertyName*.OnValueChanged += (oldValue, newValue)=>
 {   
-    typedElement.*ElementPropertyName*.MuteValueChangedEvent(true);
+    element.*ElementPropertyName*.MuteValueChangedEvent(true);
     *ViewModelName*.*PropertyName* = newValue;
-    typedElement.*ElementPropertyName*.MuteValueChangedEvent(false);
+    element.*ElementPropertyName*.MuteValueChangedEvent(false);
 };
-*V2VMBindingInvocationName* = typedElement.*ElementPropertyName*.GetLastInvocation();
+*V2VMBindingInvocationName* = element.*ElementPropertyName*.GetLastInvocation();
 ";
         const string V2VMUnbindingTemplate = @"
-typedElement.*ElementPropertyName*.RemoveValueChanged(*V2VMBindingInvocationName*);
+element.*ElementPropertyName*.RemoveValueChanged(*V2VMBindingInvocationName*);
 ";
         #endregion
     }
