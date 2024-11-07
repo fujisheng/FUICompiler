@@ -65,7 +65,6 @@ namespace *Namespace*
         const string ConvertMark = "*Convert*";
         const string ElementTypeMark = "*ElementType*";
         const string ElementPathMark = "*ElementPath*";
-        const string ElementUpdateValueMark = "*ElementUpdateValue*";
         const string ElementPropertyNameMark = "*ElementPropertyName*";
         const string ListBindingMark = "*ListBinding*";
 
@@ -76,21 +75,14 @@ void *PropertyChangedFunctionName*(object sender, *PropertyType* preValue, *Prop
     *Convert*
     var element = FUI.Extensions.ViewExtensions.GetElement<*ElementType*>(this.View, ""*ElementPath*"");
     *ListBinding*
-    *ElementUpdateValue*
+
+    var exception = $""Cannot convert the property *ViewModelType*.*PropertyName*(*PropertyType*) to the property *ElementType*.*ElementPropertyName*({element.*ElementPropertyName*.GetType()}), please consider using Convertor for this binding..."";
+    element.*ElementPropertyName*.SetValue(convertedValue, exception);
 }
 ";
         //ListView绑定模板
         const string ListBindingTemplate = @"
-FUI.Extensions.BindingContextExtensions.BindingList(element, preValue, @value);
-";
-
-        //Element属性更新模板
-        const string ElementPropertyUpdateValue = @"
-    if(element is *ElementType* typedElement)
-    {
-        var exception = $""Cannot convert the property *ViewModelType*.*PropertyName*(*PropertyType*) to the property *ElementType*.*ElementPropertyName*({typedElement.*ElementPropertyName*.GetType()}), please consider using Convertor for this binding..."";
-        typedElement.*ElementPropertyName*.SetValue(convertedValue, exception);
-    }
+FUI.Extensions.BindingContextExtensions.BindingList<*ElementType*>(element, preValue, @value);
 ";
 
         //ListView解绑模板
@@ -111,7 +103,7 @@ void *V2VMBindingFunctionName*(*ViewModelType* *ViewModelName*)
     var element = FUI.Extensions.ViewExtensions.GetElement<*ElementType*>(this.View, ""*ElementPath*"");
 
     var exception = $""Cannot convert the property *ViewModelType*.*PropertyName*(*PropertyType*) to the property *ElementType*.*ElementPropertyName*({element.*ElementPropertyName*.GetType()}), please consider using Convertor for this binding..."";
-        *V2VMOperate*
+    *V2VMOperate*
 }          
 ";
         const string V2VMBindingTemplate = @"

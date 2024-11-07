@@ -133,28 +133,26 @@ namespace FUICompiler
             var convert = BuildConvert(bindingContext.type, property);
 
             //如果这个属性是List则生成List绑定代码
-            var listBinding = property.type.isList ? ListBindingTemplate : string.Empty;
+            var listBinding = property.type.isList ? ListBindingTemplate.Replace(ElementTypeMark, property.elementType.ToTypeString()) : string.Empty;
 
             //为属性生成对应的绑定方法
             var propertyChangedFunctionName = $"{vmName}_{property.name}_PropertyChanged_{Utility.ToCSharpName(property.elementPath)}_{Utility.ToCSharpName(property.elementType.ToTypeString())}";
 
-            //元素值更新代码生成
-            var elementUpdateValue = ElementPropertyUpdateValue
-                    .Replace(ElementTypeMark, property.elementType.ToTypeString())
-                    .Replace(ElementPropertyNameMark, property.elementPropertyName)
-                    .Replace(PropertyNameMark, property.name)
-                    .Replace(PropertyTypeMark, property.type.ToTypeString())
-                    .Replace(ViewModelTypeMark, vmName);
-
             //构建属性绑定代码
-            bindingFunctionBuilder.AppendLine(BindingItemFunctionTemplate.Replace(PropertyChangedFunctionNameMark, propertyChangedFunctionName)
-                .Replace(PropertyNameMark, property.name))
+            bindingFunctionBuilder.AppendLine(BindingItemFunctionTemplate
+                .Replace(PropertyChangedFunctionNameMark, propertyChangedFunctionName)
                 .Replace(PropertyTypeMark, property.type.ToTypeString())
+
                 .Replace(ConvertMark, convert)
+
                 .Replace(ElementTypeMark, property.elementType.ToTypeString())
                 .Replace(ElementPathMark, property.elementPath)
+
                 .Replace(ListBindingMark, listBinding)
-                .Replace(ElementUpdateValueMark, elementUpdateValue);
+
+                .Replace(ViewModelTypeMark, vmName)
+                .Replace(PropertyNameMark, property.name)
+                .Replace(ElementPropertyNameMark, property.elementPropertyName));
 
             //生成属性绑定代码
             bindingItemsBuilder.AppendLine($"{vmName}.{delegateName} += {propertyChangedFunctionName};");
