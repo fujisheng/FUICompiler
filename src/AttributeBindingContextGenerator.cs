@@ -1,5 +1,4 @@
 ﻿using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace FUICompiler
@@ -99,8 +98,22 @@ namespace FUICompiler
                 }
             }
 
-            //如果没有通过特性绑定属性 则不生成绑定上下文
-            if(bindingContext.properties.Count > 0)
+            //获取命令绑定
+            foreach(var method in classDeclaration.ChildNodes().OfType<MethodDeclarationSyntax>())
+            {
+                if(!Utility.TryGetCommandBindingAttribute(method, out var commandAttributes))
+                {
+                    continue;
+                }
+
+                foreach(var commandAttribute in commandAttributes)
+                {
+                    CreateCommand(classDeclaration, method, commandAttribute, bindingContext);
+                }
+            }
+
+            //如果没有绑定的属性或命令 则不生成绑定上下文
+            if(bindingContext.properties.Count > 0 || bindingContext.commands.Count > 0)
             {
                 bindingConfig.contexts.Add(bindingContext);
             }
@@ -180,6 +193,51 @@ namespace FUICompiler
             });
 
             //Console.WriteLine($"property:{propertyName}  type:{propertyType} elementName:{elementPath}  elementType:{elementType} converterType:{converterType}");
+        }
+
+
+        /// <summary>
+        /// 创建命令绑定配置文件
+        /// </summary>
+        /// <param name="property">属性定义文件</param>
+        /// <param name="commandAttribute">属性特性</param>
+        /// <param name="bindingContext">当前绑定上下文配置</param>
+        void CreateCommand(ClassDeclarationSyntax clazz, MethodDeclarationSyntax method, AttributeSyntax commandAttribute, BindingContext bindingContext)
+        {
+            var elementType = string.Empty;
+            var elementPath = string.Empty;
+            var targetPropertyName = string.Empty;
+
+            for (int i = 0; i < commandAttribute.ArgumentList.Arguments.Count; i++)
+            {
+                var args = commandAttribute.ArgumentList.Arguments[i];
+
+                //当参数是字符串字面量时 说明是元素路径
+                if (args.Expression is LiteralExpressionSyntax arg)
+                {
+                    elementPath = arg.Token.ValueText;
+                }
+
+                //解析nameof  说明是绑定到某个element的某个属性
+                if (args.Expression is InvocationExpressionSyntax invocationArgs && invocationArgs.Expression.ToString() == "nameof")
+                {
+                    var a = invocationArgs.ArgumentList.Arguments[0];
+                    var expression = a.ToString();
+                    var lastDotIndex = expression.IndexOf('.');
+                    elementType = expression.Substring(0, lastDotIndex);
+                    targetPropertyName = expression.Substring(lastDotIndex + 1);
+                }
+            }
+
+            var methodName = method.Identifier.Text;
+
+            bindingContext.commands.Add(new BindingCommand
+            {
+                name = methodName,
+                elementType = new TypeInfo { fullName = elementType, name = elementType },
+                elementPath = elementPath,
+                elementPropertyName = targetPropertyName,
+            });
         }
     }
 }

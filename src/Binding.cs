@@ -74,10 +74,19 @@
         public BindingType bindingType;
     }
 
+    public class BindingCommand
+    {
+        public string name;
+        public string elementPath;
+        public TypeInfo elementType;
+        public string elementPropertyName;
+    }
+
     public class BindingContext
     {
         public string type;
         public List<BindingProperty> properties = new List<BindingProperty>();
+        public List<BindingCommand> commands = new List<BindingCommand>();
     }
 
     public class BindingConfig

@@ -5,6 +5,10 @@
     /// </summary>
     public partial class BindingContextGenerator
     {
+        #region 文件头
+        const string FileHeadMark = "*FileHead*";
+        #endregion
+
         #region 类模板
         const string ViewNameMark = "*ViewName*";
         const string BindingMark = "*Binding*";
@@ -20,6 +24,7 @@
 
 
         const string Template = @"
+*FileHead*
 *Using*
 namespace *Namespace*
 {
@@ -117,6 +122,25 @@ element.*ElementPropertyName*.OnValueChanged += (oldValue, newValue)=>
 ";
         const string V2VMUnbindingTemplate = @"
 element.*ElementPropertyName*.RemoveValueChanged(*V2VMBindingInvocationName*);
+";
+        #endregion
+
+        #region 命令绑定模板
+        const string CommandBindingFunctionNameMark = "*CommandBindingFunctionName*";
+        const string CommandOperateMark = "*CommandOperate*";
+        const string MethodNameMark = "*MethodName*";
+        const string CommandBindingFunctionTemplate = @"
+void *CommandBindingFunctionName*(*ViewModelType* *ViewModelName*)
+{
+    var element = FUI.Extensions.ViewExtensions.GetElement<*ElementType*>(this.View, ""*ElementPath*"");
+    *CommandOperate*
+}       
+";
+        const string CommandBindingTemplate = @"
+element.*ElementPropertyName*.AddListener(*ViewModelName*.*MethodName*);
+";
+        const string CommandUnbindingTemplate = @"
+element.*ElementPropertyName*.RemoveListener(*ViewModelName*.*MethodName*);
 ";
         #endregion
     }

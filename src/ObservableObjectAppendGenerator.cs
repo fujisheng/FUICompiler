@@ -29,6 +29,9 @@ namespace FUICompiler
 
                 var appendBuilder = new StringBuilder();
 
+                //文件头
+                appendBuilder.AppendLine(Utility.FileHead);
+
                 //添加using
                 if (usings != null)
                 {
@@ -106,7 +109,7 @@ namespace FUICompiler
                 }
                 var code = Utility.NormalizeCode(appendBuilder.ToString());
                 //Console.WriteLine($"generate property changed for {oldClass.Identifier.Text}");
-                sources.Add(new Source($"{oldClass.Identifier.Text}.PropertyChanged", code));
+                sources.Add(new Source($"{oldClass.Identifier.Text}.PropertyChanged.g", code));
                 return newClass;
             });
 
