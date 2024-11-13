@@ -61,9 +61,12 @@ namespace FUICompiler
                     return oldClass;
                 }
 
-                var newClass = oldClass.WithModifiers(SyntaxFactory.TokenList());
-                newClass = newClass.AddModifiers(SyntaxFactory.Token(SyntaxKind.WhitespaceTrivia),SyntaxFactory.Token(SyntaxKind.PublicKeyword), SyntaxFactory.Token(SyntaxKind.WhitespaceTrivia));//.NormalizeWhitespace();
-                newClass = newClass.AddModifiers(SyntaxFactory.Token(SyntaxKind.WhitespaceTrivia), SyntaxFactory.Token(SyntaxKind.PartialKeyword),SyntaxFactory.Token(SyntaxKind.WhitespaceTrivia));//.NormalizeWhitespace();
+                //修改修饰符  不知为何用Token来创建会有问题  只有用这种模板的方式创建
+                string templateClass = @"public partial class C{}";
+                var templateClassTree = CSharpSyntaxTree.ParseText(templateClass);
+                var tempClass = templateClassTree.GetRoot().DescendantNodes().OfType<ClassDeclarationSyntax>().First();
+
+                var newClass = oldClass.WithModifiers(tempClass.Modifiers);
 
                 //遍历所有属性 生成对应委托
                 var propertites = newClass.ChildNodes().OfType<PropertyDeclarationSyntax>().ToArray();
