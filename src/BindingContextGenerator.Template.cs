@@ -82,7 +82,7 @@ void *PropertyChangedFunctionName*(object sender, *PropertyType* preValue, *Prop
     *ListBinding*
 
     var exception = $""Cannot convert the property *ViewModelType*.*PropertyName*(*PropertyType*) to the property *ElementType*.*ElementPropertyName*({element.*ElementPropertyName*.GetType()}), please consider using Convertor for this binding..."";
-    element.*ElementPropertyName*.SetValue(convertedValue, exception);
+    element.*ElementPropertyName*?.SetValue(convertedValue, exception);
 }
 ";
         //ListView绑定模板
@@ -121,7 +121,7 @@ element.*ElementPropertyName*.OnValueChanged += (oldValue, newValue)=>
 *V2VMBindingInvocationName* = element.*ElementPropertyName*.GetLastInvocation();
 ";
         const string V2VMUnbindingTemplate = @"
-element.*ElementPropertyName*.RemoveValueChanged(*V2VMBindingInvocationName*);
+element.*ElementPropertyName*?.RemoveValueChanged(*V2VMBindingInvocationName*);
 ";
         #endregion
 
@@ -137,10 +137,10 @@ void *CommandBindingFunctionName*(*ViewModelType* *ViewModelName*)
 }       
 ";
         const string CommandBindingTemplate = @"
-element.*ElementPropertyName*.AddListener(*ViewModelName*.*MethodName*);
+element.*ElementPropertyName*?.AddListener(*ViewModelName*.*MethodName*);
 ";
         const string CommandUnbindingTemplate = @"
-element.*ElementPropertyName*.RemoveListener(*ViewModelName*.*MethodName*);
+element.*ElementPropertyName*?.RemoveListener(*ViewModelName*.*MethodName*);
 ";
         #endregion
     }
