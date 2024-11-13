@@ -73,7 +73,7 @@ namespace FUICompiler
                     }
 
                     //如果是双向绑定需要构建从View到ViewModel的绑定
-                    if(property.bindingType == BindingType.TwoWay)
+                    if(property.bindingMode.HasFlag(BindingMode.OneWayToSource))
                     {
                         BuildV2VMBinding(vmName, property, ref bindingItemsBuilder, ref unbindingItemsBuilder, ref bindingFunctionsBuilder);
                     }

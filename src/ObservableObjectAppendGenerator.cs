@@ -62,8 +62,8 @@ namespace FUICompiler
                 }
 
                 var newClass = oldClass.WithModifiers(SyntaxFactory.TokenList());
-                newClass = newClass.AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword)).NormalizeWhitespace();
-                newClass = newClass.AddModifiers(SyntaxFactory.Token(SyntaxKind.PartialKeyword)).NormalizeWhitespace();
+                newClass = newClass.AddModifiers(SyntaxFactory.Token(SyntaxKind.WhitespaceTrivia),SyntaxFactory.Token(SyntaxKind.PublicKeyword), SyntaxFactory.Token(SyntaxKind.WhitespaceTrivia));//.NormalizeWhitespace();
+                newClass = newClass.AddModifiers(SyntaxFactory.Token(SyntaxKind.WhitespaceTrivia), SyntaxFactory.Token(SyntaxKind.PartialKeyword),SyntaxFactory.Token(SyntaxKind.WhitespaceTrivia));//.NormalizeWhitespace();
 
                 //遍历所有属性 生成对应委托
                 var propertites = newClass.ChildNodes().OfType<PropertyDeclarationSyntax>().ToArray();

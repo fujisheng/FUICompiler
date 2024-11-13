@@ -13,12 +13,12 @@ namespace FUICompiler
         public Source(string name, string text)
         {
             this.name = name;
-            this.Text = SourceText.From(text);
+            this.Text = SourceText.From(text, System.Text.Encoding.UTF8);
         }
 
         public void BuildText(string text)
         {
-            this.Text = SourceText.From(text);
+            this.Text = SourceText.From(text, System.Text.Encoding.UTF8);
         }
     }
 

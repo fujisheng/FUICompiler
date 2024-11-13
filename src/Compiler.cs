@@ -1,6 +1,7 @@
 ﻿using Microsoft.Build.Locator;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.MSBuild;
 
 using Mono.Cecil;
@@ -128,14 +129,14 @@ namespace FUICompiler
             foreach (var add in addition)
             {
                 var filePath = string.IsNullOrEmpty(param.generatedPath) ? null : $"{param.generatedPath}\\{add.name}.cs";
-                project = project.AddDocument(add.name, CSharpSyntaxTree.ParseText(add.Text).GetRoot(), filePath: Path.GetFullPath(filePath)).Project; 
+                project = project.AddDocument(add.name, add.Text, filePath: Path.GetFullPath(filePath)).Project;
             }
 
             //编译工程
             var asm = await InternalBuild(project);
 
             //编译失败
-            if(asm == null)
+            if(asm == default)
             {
                 Message.Message.WriteMessage(Message.MessageType.Log, new Message.LogMessage
                 {
@@ -146,7 +147,10 @@ namespace FUICompiler
             }
 
             //编译成功 输出最终的dll
-            asm.Write(param.output);
+            var dllPath = $"{param.output}\\{param.projectName}.dll";
+            var pdbPath = $"{param.output}\\{param.projectName}.pdb";
+            File.WriteAllBytes(dllPath, asm.dllStream.ToArray());
+            File.WriteAllBytes(pdbPath, asm.pdbStream.ToArray());
 
             Message.Message.WriteMessage(Message.MessageType.Log, new Message.LogMessage
             {
@@ -160,12 +164,14 @@ namespace FUICompiler
         /// </summary>
         /// <param name="project">工程</param>
         /// <returns></returns>
-        async Task<AssemblyDefinition> InternalBuild(Project project)
+        async Task<(MemoryStream dllStream, MemoryStream pdbStream)> InternalBuild(Project project)
         {
             var compilation = await project.GetCompilationAsync();
-            var ms = new MemoryStream();
+            var dllStream = new MemoryStream();
+            var pdbStream = new MemoryStream();
 
-            var result = compilation.Emit(ms);
+            var emitOptions = new EmitOptions(false, DebugInformationFormat.PortablePdb);
+            var result = compilation.Emit(dllStream, pdbStream, options: emitOptions);
             if (!result.Success)
             {
                 IEnumerable<Diagnostic> failures = result.Diagnostics.Where(diagnostic =>
@@ -179,11 +185,12 @@ namespace FUICompiler
                         Error = diagnostic.ToString()
                     });
                 }
-                return null;
+                return default;
             }
 
-            ms.Seek(0, SeekOrigin.Begin);
-            return AssemblyDefinition.ReadAssembly(ms);
+            dllStream.Seek(0, SeekOrigin.Begin);
+            pdbStream.Seek(0, SeekOrigin.Begin);
+            return (dllStream, pdbStream);
         }
 
         /// <summary>
@@ -242,7 +249,7 @@ namespace FUICompiler
 
             foreach (var item in temp)
             {
-                project = project.RemoveDocument(item.remove).AddDocument(item.add.Name, item.add.GetTextAsync().Result).Project;
+                project = project.RemoveDocument(item.remove).AddDocument(item.add.Name, item.add.GetTextAsync().Result, filePath:item.add.FilePath).Project;
             }
 
             return project;
@@ -291,7 +298,7 @@ namespace FUICompiler
             foreach (var source in addition)
             {
                 var fileName = $"{source.name}.cs";
-                File.WriteAllText($"{directoryInfo.FullName}\\{fileName}", source.Text.ToString());
+                File.WriteAllText($"{directoryInfo.FullName}\\{fileName}", source.Text.ToString(), System.Text.Encoding.UTF8);
             }
         }
     }

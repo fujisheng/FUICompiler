@@ -52,10 +52,22 @@
         }
     }
 
-    public enum BindingType
+    public enum BindingMode
     {
-        OneWay,
-        TwoWay,
+        /// <summary>
+        /// ViewModel->View
+        /// </summary>
+        OneWay = 1 << 0,
+
+        /// <summary>
+        /// View->ViewModel
+        /// </summary>
+        OneWayToSource = 1 << 1,
+
+        /// <summary>
+        /// ViewModel<->View
+        /// </summary>
+        TwoWay = OneWay | OneWayToSource,
     }
 
     public class BindingProperty
@@ -71,7 +83,7 @@
         public TypeInfo elementValueType;
         public string elementPropertyName;
 
-        public BindingType bindingType;
+        public BindingMode bindingMode;
     }
 
     public class BindingCommand

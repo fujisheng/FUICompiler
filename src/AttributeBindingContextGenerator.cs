@@ -131,7 +131,7 @@ namespace FUICompiler
             var elementPath = string.Empty;
             var converterType = string.Empty;
             var targetPropertyName = string.Empty;
-            var bindingType = BindingType.OneWay;
+            var bindingMode = BindingMode.OneWay;
 
             for (int i = 0; i < propertyAttribute.ArgumentList.Arguments.Count; i++)
             {
@@ -157,7 +157,7 @@ namespace FUICompiler
                 if (args.Expression is TypeOfExpressionSyntax typeArg)
                 {
                     //当有可选参数 且参数名为converterType时 说明是转换器类型
-                    if (args.NameColon != null && args.NameColon.Name.ToString() == "converterType")
+                    if (args.NameColon != null && args.NameColon.Name.ToString() == "converterMode")
                     {
                         converterType = typeArg.Type.ToString();
                         continue;
@@ -173,7 +173,7 @@ namespace FUICompiler
                 //当参数是成员访问表达式时 说明是绑定类型
                 if(args.Expression is MemberAccessExpressionSyntax memberAccess)
                 {
-                    bindingType = Enum.Parse<BindingType>(memberAccess.Name.ToString());
+                    bindingMode = Enum.Parse<BindingMode>(memberAccess.Name.ToString());
                 }
             }
 
@@ -188,7 +188,7 @@ namespace FUICompiler
                 elementType = new TypeInfo { fullName = elementType, name = elementType},
                 converterType = new TypeInfo { fullName = converterType , name = converterType},
                 elementPath = elementPath,
-                bindingType = bindingType, 
+                bindingMode = bindingMode, 
                 elementPropertyName = targetPropertyName,
             });
 
