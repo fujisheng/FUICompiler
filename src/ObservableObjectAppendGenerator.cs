@@ -1,7 +1,9 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 
+using System.Collections.Frozen;
 using System.Text;
 
 namespace FUICompiler
@@ -95,21 +97,12 @@ namespace FUICompiler
 
                     var newProperty = property;
 
-                    if (property.Initializer != null)
+                    if (newProperty.Initializer != null)
                     {
-                       
-                        //newProperty = property.WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.None));
-                        //newProperty = property.WithInitializer(null);
-                        var template = "//";
-                        var templateTree = CSharpSyntaxTree.ParseText(template);
-                        Message.Message.WriteMessage(Message.MessageType.Log, new Message.LogMessage
-                        {
-                            Level = Message.LogLevel.Info,
-                            Message = templateTree.ToString()
-                        });
-                        var insert = new List<SyntaxNode>() { templateTree.GetRoot() };
-                        newProperty = newProperty.InsertNodesBefore(newProperty.Initializer, insert);//.WithSemicolonToken(newProperty.SemicolonToken)
-                        //newProperty = newProperty.RemoveNode(newProperty.Initializer, SyntaxRemoveOptions.KeepEndOfLine);
+                        newProperty = newProperty.WithInitializer(null);
+                         
+                        //TODO:这句代码会导致行数发生变化   目前不知道有没有其他方式
+                        newProperty = newProperty.ReplaceToken(newProperty.SemicolonToken, SyntaxFactory.Token(SyntaxKind.None));
                     }
                     return ModifyPropertyGetSet(newProperty, fieldName, delegateName);
                 });
@@ -132,12 +125,6 @@ namespace FUICompiler
                 //Console.WriteLine($"generate property changed for {oldClass.Identifier.Text}");
                 sources.Add(new Source($"{oldClass.Identifier.Text}.PropertyChanged.g", code));
                 return newClass;
-            });
-
-            Message.Message.WriteMessage(Message.MessageType.Log, new Message.LogMessage
-            {
-                Level = Message.LogLevel.Info,
-                Message = $"compiler complete at:{newRoot}"
             });
 
             return sources.ToArray();

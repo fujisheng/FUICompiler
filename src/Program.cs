@@ -9,7 +9,7 @@ const string contextGenerateTypeMark = "--ctx_type";
 
 
 var compiler = new Compiler();
-//string workspace = "..\\..\\..\\..\\..\\..\\FUI\\";
+//string workspace = "..\\..\\..\\..\\..\\FUI\\";
 //args = $"--sln={workspace}.\\FUI.sln --project=FUI.Test --output={workspace}.\\Library\\ScriptAssemblies --binding={workspace}.\\Binding\\ --generated={workspace}.\\Temp\\BindingGenerated\\ --ctx_type=Attribute".Split(' ');
 var param = ParseArgs(args);
 
