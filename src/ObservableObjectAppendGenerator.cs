@@ -27,6 +27,12 @@ namespace FUICompiler
                     return oldClass;
                 }
 
+                //如果是静态类或者抽象类直接不管
+                if (oldClass.Modifiers.Any((k) => k.IsKind(SyntaxKind.StaticKeyword) || k.IsKind(SyntaxKind.AbstractKeyword)))
+                {
+                    return oldClass;
+                }
+
                 var appendBuilder = new StringBuilder();
 
                 //文件头
@@ -54,12 +60,6 @@ namespace FUICompiler
                 appendBuilder.AppendLine("{");
 
                 var syncPropertiesBuilder = new StringBuilder();
-
-                //如果是静态类或者抽象类直接不管
-                if (oldClass.Modifiers.Any((k) => k.IsKind(SyntaxKind.StaticKeyword) || k.IsKind(SyntaxKind.AbstractKeyword)))
-                {
-                    return oldClass;
-                }
 
                 //修改修饰符  不知为何用Token来创建会有问题  只有用这种模板的方式创建
                 string templateClass = @"public partial class C{}";
@@ -95,13 +95,31 @@ namespace FUICompiler
 
                     var newProperty = property;
 
-                    if(property.Initializer != null)
+                    if (property.Initializer != null)
                     {
-                        newProperty = property.WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.None));
-                        newProperty = newProperty.RemoveNode(newProperty.Initializer, SyntaxRemoveOptions.KeepNoTrivia);
+                       
+                        //newProperty = property.WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.None));
+                        //newProperty = property.WithInitializer(null);
+                        var template = "//";
+                        var templateTree = CSharpSyntaxTree.ParseText(template);
+                        Message.Message.WriteMessage(Message.MessageType.Log, new Message.LogMessage
+                        {
+                            Level = Message.LogLevel.Info,
+                            Message = templateTree.ToString()
+                        });
+                        var insert = new List<SyntaxNode>() { templateTree.GetRoot() };
+                        newProperty = newProperty.InsertNodesBefore(newProperty.Initializer, insert);//.WithSemicolonToken(newProperty.SemicolonToken)
+                        //newProperty = newProperty.RemoveNode(newProperty.Initializer, SyntaxRemoveOptions.KeepEndOfLine);
                     }
                     return ModifyPropertyGetSet(newProperty, fieldName, delegateName);
                 });
+
+                var events = newClass.DescendantNodes().OfType<EventFieldDeclarationSyntax>().ToArray();
+                foreach (var @event in events)
+                {
+                    var eventCaller = GenerateEventCaller(@event);
+                    appendBuilder.AppendLine(eventCaller);
+                }
 
                 GenerateSyncPropertites(appendBuilder, syncPropertiesBuilder);
 
@@ -114,6 +132,12 @@ namespace FUICompiler
                 //Console.WriteLine($"generate property changed for {oldClass.Identifier.Text}");
                 sources.Add(new Source($"{oldClass.Identifier.Text}.PropertyChanged.g", code));
                 return newClass;
+            });
+
+            Message.Message.WriteMessage(Message.MessageType.Log, new Message.LogMessage
+            {
+                Level = Message.LogLevel.Info,
+                Message = $"compiler complete at:{newRoot}"
             });
 
             return sources.ToArray();
@@ -160,7 +184,7 @@ namespace FUICompiler
             var getBody = SyntaxFactory.ParseStatement(getBodyString);
             var newProperty = property.WithAccessorList(
                 property.AccessorList.WithAccessors(
-                    SyntaxFactory.List<AccessorDeclarationSyntax>(
+                    SyntaxFactory.List(
                         new AccessorDeclarationSyntax[] 
                         {
                             oldGet.WithBody(SyntaxFactory.Block(getBody)),
@@ -168,6 +192,23 @@ namespace FUICompiler
                         })
                 ));
             return newProperty;
+        }
+
+        /// <summary>
+        /// 生成事件触发方法
+        /// </summary>
+        /// <param name="syntax">事件字段</param>
+        /// <returns></returns>
+        string GenerateEventCaller(EventFieldDeclarationSyntax syntax)
+        {
+            var argsType = (syntax.Declaration.Type as GenericNameSyntax).TypeArgumentList.Arguments;
+            var callerName = Utility.GetEventMethodName(syntax.Declaration.Variables.ToString());
+            return $$"""
+public void {{callerName}} ({{argsType}} args)
+{
+    this.{{syntax.Declaration.Variables}}?.Invoke(args);
+}
+""";
         }
     }
 }

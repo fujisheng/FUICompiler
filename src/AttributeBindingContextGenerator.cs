@@ -98,7 +98,7 @@ namespace FUICompiler
                 }
             }
 
-            //获取命令绑定
+            //获取方法命令绑定
             foreach(var method in classDeclaration.ChildNodes().OfType<MethodDeclarationSyntax>())
             {
                 if(!Utility.TryGetCommandBindingAttribute(method, out var commandAttributes))
@@ -108,7 +108,22 @@ namespace FUICompiler
 
                 foreach(var commandAttribute in commandAttributes)
                 {
-                    CreateCommand(classDeclaration, method, commandAttribute, bindingContext);
+                    CreateCommand(classDeclaration, method.Identifier.Text, commandAttribute, bindingContext);
+                }
+            }
+
+            //获取事件命令绑定
+            foreach (var @event in classDeclaration.ChildNodes().OfType<EventFieldDeclarationSyntax>())
+            {
+                if (!Utility.TryGetCommandBindingAttribute(@event, out var commandAttributes))
+                {
+                    continue;
+                }
+
+                foreach (var commandAttribute in commandAttributes)
+                {
+                    var eventMethodName = Utility.GetEventMethodName(@event.Declaration.Variables.ToString());
+                    CreateCommand(classDeclaration, eventMethodName, commandAttribute, bindingContext);
                 }
             }
 
@@ -202,7 +217,7 @@ namespace FUICompiler
         /// <param name="property">属性定义文件</param>
         /// <param name="commandAttribute">属性特性</param>
         /// <param name="bindingContext">当前绑定上下文配置</param>
-        void CreateCommand(ClassDeclarationSyntax clazz, MethodDeclarationSyntax method, AttributeSyntax commandAttribute, BindingContext bindingContext)
+        void CreateCommand(ClassDeclarationSyntax clazz, string methodName, AttributeSyntax commandAttribute, BindingContext bindingContext)
         {
             var elementType = string.Empty;
             var elementPath = string.Empty;
@@ -228,8 +243,6 @@ namespace FUICompiler
                     targetPropertyName = expression.Substring(lastDotIndex + 1);
                 }
             }
-
-            var methodName = method.Identifier.Text;
 
             bindingContext.commands.Add(new BindingCommand
             {

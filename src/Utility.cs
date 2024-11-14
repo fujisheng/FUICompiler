@@ -432,13 +432,13 @@ namespace FUICompiler
         /// <summary>
         /// 尝试获取命令绑定特性
         /// </summary>
-        /// <param name="methodDeclarationSyntax">方法定义</param>
+        /// <param name="memberDeclarationSyntax">方法定义</param>
         /// <param name="attributes">特性列表</param>
         /// <returns></returns>
-        public static bool TryGetCommandBindingAttribute(MethodDeclarationSyntax methodDeclarationSyntax, out List<AttributeSyntax> attributes) 
+        public static bool TryGetCommandBindingAttribute(MemberDeclarationSyntax memberDeclarationSyntax, out List<AttributeSyntax> attributes) 
         {
             attributes = new List<AttributeSyntax>();
-            var methodAttributes = methodDeclarationSyntax.AttributeLists.ToList();
+            var methodAttributes = memberDeclarationSyntax.AttributeLists.ToList();
             foreach(var att in methodAttributes)
             {
                 foreach(var node in att.ChildNodes().OfType<AttributeSyntax>())
@@ -454,6 +454,16 @@ namespace FUICompiler
             }
 
             return attributes.Count > 0;
+        }
+
+        /// <summary>
+        /// 获取Event对应的方法名
+        /// </summary>
+        /// <param name="eventName">event名字</param>
+        /// <returns></returns>
+        public static string GetEventMethodName(string eventName)
+        {
+            return $"__EventMethod_{eventName}";
         }
 
         /// <summary>
