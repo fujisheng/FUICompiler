@@ -63,12 +63,12 @@ namespace FUICompiler
 
                 var syncPropertiesBuilder = new StringBuilder();
 
-                //修改修饰符  不知为何用Token来创建会有问题  只有用这种模板的方式创建
-                string templateClass = @"public partial class C{}";
-                var templateClassTree = CSharpSyntaxTree.ParseText(templateClass);
-                var tempClass = templateClassTree.GetRoot().DescendantNodes().OfType<ClassDeclarationSyntax>().First();
-
-                var newClass = oldClass.WithModifiers(tempClass.Modifiers);
+                //修改其修饰符为 public partial 
+                var modifiers = SyntaxFactory.TokenList(
+                        SyntaxFactory.Token(SyntaxKind.PublicKeyword).WithTrailingTrivia(SyntaxFactory.Whitespace(" ")),
+                        SyntaxFactory.Token(SyntaxKind.PartialKeyword).WithTrailingTrivia(SyntaxFactory.Whitespace(" "))
+                    );
+                var newClass = oldClass.WithModifiers(modifiers);
 
                 //遍历所有属性 生成对应委托
                 var propertites = newClass.ChildNodes().OfType<PropertyDeclarationSyntax>().ToArray();
@@ -97,12 +97,16 @@ namespace FUICompiler
 
                     var newProperty = property;
 
+                    //如果这个属性包含初始化语句 则需要移除
                     if (newProperty.Initializer != null)
                     {
+                        //移除属性赋值 "=xxx"
                         newProperty = newProperty.WithInitializer(null);
-                         
-                        //TODO:这句代码会导致行数发生变化   目前不知道有没有其他方式
-                        newProperty = newProperty.ReplaceToken(newProperty.SemicolonToken, SyntaxFactory.Token(SyntaxKind.None));
+                        //移除属性后面的;号  这儿移除后会同时移除掉其换行符  所以再加上去
+                        var newToken = SyntaxFactory.MissingToken(SyntaxKind.SemicolonToken);
+                        newProperty = newProperty.ReplaceToken(newProperty.SemicolonToken, newToken);
+                        var endOfLine = SyntaxFactory.EndOfLine("\n");
+                        newProperty = newProperty.WithTrailingTrivia(endOfLine);
                     }
                     return ModifyPropertyGetSet(newProperty, fieldName, delegateName);
                 });
