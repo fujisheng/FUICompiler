@@ -82,7 +82,7 @@ void *PropertyChangedFunctionName*(object sender, *PropertyType* preValue, *Prop
     *ListBinding*
 
     var exception = $""Cannot convert the property *ViewModelType*.*PropertyName*(*PropertyType*) to the property *ElementType*.*ElementPropertyName*({element.*ElementPropertyName*.GetType()}), please consider using Convertor for this binding..."";
-    element.*ElementPropertyName*?.SetValue(convertedValue, exception);
+    element.*ElementPropertyName*?.SetValue(convertedValue);
 }
 ";
         //ListView绑定模板
