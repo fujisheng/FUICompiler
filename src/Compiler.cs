@@ -113,11 +113,13 @@ namespace FUICompiler
                 throw new Exception($"build error: project {param.projectName} not found in solution {param.solutionPath}");
             }
 
+            var compilation = await project.GetCompilationAsync();
+
             //所有生成的代码
             List<Source> addition = new List<Source>();
 
             //修改类型语法树并生成代码
-            project = await ModifyTypeSyntaxAndGenerate(project, addition);
+            project = await ModifyTypeSyntaxAndGenerate(project, compilation, addition);
 
             //编译前源代码生成器
             GenerateBeforeCompiler(addition);
@@ -220,7 +222,7 @@ namespace FUICompiler
         /// <param name="project">要修改的类型所在的工程</param>
         /// <param name="addition">生成的代码</param>
         /// <returns></returns>
-        async Task<Project> ModifyTypeSyntaxAndGenerate(Project project, List<Source> addition)
+        async Task<Project> ModifyTypeSyntaxAndGenerate(Project project, Compilation compilation, List<Source> addition)
         {
             List<(DocumentId remove, Document add)> temp = new List<(DocumentId remove, Document add)>();
             foreach (var document in project.Documents)
@@ -231,10 +233,12 @@ namespace FUICompiler
                     continue;
                 }
 
+                var semanticModel = compilation.GetSemanticModel(root.SyntaxTree);
+
                 //根据类型语法树生成代码
-                foreach(var type in typeSyntaxRootGenerators)
+                foreach (var type in typeSyntaxRootGenerators)
                 {
-                    var append = type.Generate(root, out var newRoot);
+                    var append = type.Generate(semanticModel, root, out var newRoot);
                     AddSources(addition, append);
                     if(newRoot == root)
                     {

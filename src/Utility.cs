@@ -4,6 +4,10 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 using Mono.Cecil;
 
+using System.Reflection;
+
+using ICustomAttributeProvider = Mono.Cecil.ICustomAttributeProvider;
+
 namespace FUICompiler
 {
     public static class Utility
@@ -40,24 +44,6 @@ namespace FUICompiler
                 }
             }
             return false;
-        }
-
-        /// <summary>
-        /// 获取一个自定义特性
-        /// </summary>
-        /// <param name="target"></param>
-        /// <param name="attributeFullName"></param>
-        /// <returns></returns>
-        public static TypeReference GetCustomAttribute(this ICustomAttributeProvider target, string attributeFullName)
-        {
-            foreach (var attribute in target.CustomAttributes)
-            {
-                if (attribute.AttributeType.FullName == attributeFullName)
-                {
-                    return attribute.AttributeType;
-                }
-            }
-            return null;
         }
 
         /// <summary>
@@ -506,6 +492,32 @@ namespace FUICompiler
         public static bool IsNull(this TypeInfo typeInfo)
         {
             return typeInfo == null || typeInfo.IsNull();
+        }
+
+        public const string ValueConverterFullName = "FUI.IValueConverter";
+        /// <summary>
+        /// 判断一个类型是否是值转换器
+        /// </summary>
+        /// <param name="type">类型</param>
+        /// <param name="valueType">值转换器 值类型</param>
+        /// <param name="targetSymbol">值转换器 目标类型</param>
+        /// <returns></returns>
+        public static bool IsValueConverter(this ITypeSymbol type, out ITypeSymbol valueType, out ITypeSymbol targetSymbol)
+        {
+            valueType = null;
+            targetSymbol = null;
+
+            foreach (var interfaceType in type.AllInterfaces)
+            {
+                if (interfaceType.IsGenericType && interfaceType.ToString().StartsWith(ValueConverterFullName) && interfaceType.TypeArguments.Length >= 2)
+                {
+                    valueType = interfaceType.TypeArguments[0];
+                    targetSymbol = interfaceType.TypeArguments[1];
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }

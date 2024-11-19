@@ -13,7 +13,7 @@ namespace FUICompiler
     /// </summary>
     internal class ObservableObjectAppendGenerator : ITypeSyntaxNodeSourcesGenerator
     {
-        public Source?[] Generate(SyntaxNode root, out SyntaxNode newRoot)
+        public Source?[] Generate(SemanticModel semanticModel, SyntaxNode root, out SyntaxNode newRoot)
         {
             var usings = root.DescendantNodes().OfType<UsingDirectiveSyntax>().ToArray().Select(item =>
             {

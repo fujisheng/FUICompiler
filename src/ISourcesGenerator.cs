@@ -27,7 +27,7 @@ namespace FUICompiler
     /// </summary>
     internal interface ITypeSyntaxNodeSourcesGenerator
     {
-        Source?[] Generate(SyntaxNode root, out SyntaxNode newRoot);
+        Source?[] Generate(SemanticModel semanticModel, SyntaxNode root, out SyntaxNode newRoot);
     }
 
     /// <summary>
