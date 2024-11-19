@@ -1,57 +1,8 @@
 ﻿namespace FUICompiler
 {
-    public class TypeInfo
-    {
-        public string name;
-        public string fullName;
-        public bool isGenericType;
-        public bool isValueType;
-        public bool isList;
-        public List<TypeInfo> genericArguments = new List<TypeInfo>();
-
-        public static TypeInfo Create(Type type)
-        {
-            if (type == null)
-            {
-                return null;
-            }
-
-            var typeInfo = new TypeInfo();
-            typeInfo.name = type.Name;
-            typeInfo.fullName = type.FullName;
-            typeInfo.isGenericType = type.IsGenericType;
-            typeInfo.isValueType = type.IsValueType;
-            if (type.IsGenericType)
-            {
-                foreach (var argType in type.GetGenericArguments())
-                {
-                    typeInfo.genericArguments.Add(Create(argType));
-                }
-            }
-            return typeInfo;
-        }
-
-        public string ToTypeString()
-        {
-            if (isGenericType)
-            {
-                var preName = fullName.Substring(0, fullName.IndexOf("`"));
-                return $"{preName}<{string.Join(",", genericArguments.ConvertAll(arg => arg.ToTypeString()).ToArray())}>";
-            }
-            return fullName;
-        }
-
-        public bool IsNull()
-        {
-            return string.IsNullOrEmpty(name) || string.IsNullOrEmpty(fullName);
-        }
-
-        public override string ToString()
-        {
-            return ToTypeString();
-        }
-    }
-
+    /// <summary>
+    /// 绑定模式
+    /// </summary>
     public enum BindingMode
     {
         /// <summary>
@@ -70,40 +21,116 @@
         TwoWay = OneWay | OneWayToSource,
     }
 
-    public class BindingProperty
+    /// <summary>
+    /// 要绑定的属性信息
+    /// </summary>
+    public class PropertyInfo
     {
+        /// <summary>
+        /// 属性名
+        /// </summary>
         public string name;
-        public TypeInfo type;
-        public TypeInfo converterType;
-        public string elementPath;
-        public TypeInfo elementType;
 
-        public TypeInfo converterValueType;
-        public TypeInfo converterTargetType;
-        public TypeInfo elementValueType;
-        public string elementPropertyName;
+        /// <summary>
+        /// 属性类型
+        /// </summary>
+        public string type;
+
+        /// <summary>
+        /// 是否是列表类型
+        /// </summary>
+        public bool isList;
+    }
+
+    /// <summary>
+    /// 要绑定的转换器信息
+    /// </summary>
+    public class ConverterInfo
+    {
+        /// <summary>
+        /// 转换器类型
+        /// </summary>
+        public string type;
+
+        /// <summary>
+        /// 转换器源类型
+        /// </summary>
+        public string sourceType;
+
+        /// <summary>
+        /// 转换器目标类型
+        /// </summary>
+        public string targetType;
+    }
+
+    /// <summary>
+    /// 要绑定的目标信息
+    /// </summary>
+    public class TargetInfo
+    {
+        /// <summary>
+        /// 目标路径
+        /// </summary>
+        public string path;
+
+        /// <summary>
+        /// 目标类型
+        /// </summary>
+        public string type;
+
+        /// <summary>
+        /// 目标属性类型
+        /// </summary>
+        public string propertyType;
+
+        /// <summary>
+        /// 目标属性名字
+        /// </summary>
+        public string propertyName;
+
+        /// <summary>
+        /// 目标属性值类型
+        /// </summary>
+        public string propertyValueType;
+    }
+
+    /// <summary>
+    /// 属性绑定信息
+    /// </summary>
+    public class PropertyBindingInfo
+    {
+        public PropertyInfo propertyInfo;
+        public ConverterInfo converterInfo;
+        public TargetInfo targetInfo;
 
         public BindingMode bindingMode;
     }
 
-    public class BindingCommand
+    /// <summary>
+    /// 命令绑定信息
+    /// </summary>
+    public class CommandBindingInfo
     {
-        public string name;
-        public string elementPath;
-        public TypeInfo elementType;
-        public string elementPropertyName;
+        public PropertyInfo propertyInfo;
+        public TargetInfo targetInfo;
     }
 
-    public class BindingContext
+    /// <summary>
+    /// 上下文绑定信息
+    /// </summary>
+    public class ContextBindingInfo
     {
-        public string type;
-        public List<BindingProperty> properties = new List<BindingProperty>();
-        public List<BindingCommand> commands = new List<BindingCommand>();
+        public string viewModelName;
+        public List<PropertyBindingInfo> properties = new List<PropertyBindingInfo>();
+        public List<CommandBindingInfo> commands = new List<CommandBindingInfo>();
     }
 
-    public class BindingConfig
+    /// <summary>
+    /// 所有绑定信息
+    /// </summary>
+    public class BindingInfo
     {
         public string viewName = "TestView";
-        public List<BindingContext> contexts = new List<BindingContext>();
+        public List<ContextBindingInfo> contexts = new List<ContextBindingInfo>();
     }
 }

@@ -1,7 +1,12 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.Extensions.Logging;
 
+using System;
+using System.Diagnostics.Contracts;
 using System.Reflection;
+
+using TypeInfo = Microsoft.CodeAnalysis.TypeInfo;
 
 namespace FUICompiler
 {
@@ -28,7 +33,7 @@ namespace FUICompiler
                     continue;
                 }
 
-                var bindingConfig = new BindingConfig();
+                var bindingConfig = new BindingInfo();
 
                 //一个可观察对象支持绑定到多个视图
                 if (Utility.TryGetClassBindingAttribute(classDeclaration, out var attributes))
@@ -60,11 +65,11 @@ namespace FUICompiler
         /// <param name="bindingConfig">绑定配置</param>
         /// <param name="classDeclaration">类定义</param>
         /// <param name="attribute">绑定特性</param>
-        void CreateContext(BindingConfig bindingConfig, SemanticModel semanticModel, ClassDeclarationSyntax classDeclaration, AttributeSyntax attribute)
+        void CreateContext(BindingInfo bindingConfig, SemanticModel semanticModel, ClassDeclarationSyntax classDeclaration, AttributeSyntax attribute)
         {
-            var bindingContext = new BindingContext();
+            var bindingContext = new ContextBindingInfo();
 
-            bindingContext.type = classDeclaration.Identifier.Text;
+            bindingContext.viewModelName = classDeclaration.Identifier.Text;
 
             if(attribute == null)
             {
@@ -83,7 +88,7 @@ namespace FUICompiler
                     bindingConfig.viewName = arg.Token.ValueText;
                 }
             }
-            
+
             //获取属性绑定
             foreach (var property in classDeclaration.ChildNodes().OfType<PropertyDeclarationSyntax>())
             {
@@ -96,36 +101,22 @@ namespace FUICompiler
                 //为每个属性创建绑定
                 foreach (var propertyAttribute in propertyAttributes)
                 {
-                    CreateProperty(semanticModel, classDeclaration, property, propertyAttribute, bindingContext);
+                   var propertyBindingInfo = CreatePropertyBindingInfo(semanticModel, classDeclaration, property, propertyAttribute);
+                    bindingContext.properties.Add(propertyBindingInfo);
                 }
             }
 
-            //获取方法命令绑定
-            foreach(var method in classDeclaration.ChildNodes().OfType<MethodDeclarationSyntax>())
+            //获取命令绑定
+            foreach(var member in classDeclaration.ChildNodes().OfType<MemberDeclarationSyntax>())
             {
-                if(!Utility.TryGetCommandBindingAttribute(method, out var commandAttributes))
+                if(!Utility.TryGetCommandBindingAttribute(member, out var commandAttributes))
                 {
                     continue;
                 }
 
-                foreach(var commandAttribute in commandAttributes)
+                foreach(var commandAttribute  in commandAttributes)
                 {
-                    CreateCommand(classDeclaration, method.Identifier.Text, commandAttribute, bindingContext);
-                }
-            }
-
-            //获取事件命令绑定
-            foreach (var @event in classDeclaration.ChildNodes().OfType<EventFieldDeclarationSyntax>())
-            {
-                if (!Utility.TryGetCommandBindingAttribute(@event, out var commandAttributes))
-                {
-                    continue;
-                }
-
-                foreach (var commandAttribute in commandAttributes)
-                {
-                    var eventMethodName = Utility.GetEventMethodName(@event.Declaration.Variables.ToString());
-                    CreateCommand(classDeclaration, eventMethodName, commandAttribute, bindingContext);
+                    var commandBindingInfo = CreateCommand(semanticModel, classDeclaration, member, commandAttribute);
                 }
             }
 
@@ -142,70 +133,52 @@ namespace FUICompiler
         /// <param name="property">属性定义文件</param>
         /// <param name="propertyAttribute">属性特性</param>
         /// <param name="bindingContext">当前绑定上下文配置</param>
-        void CreateProperty(SemanticModel semanticModel, ClassDeclarationSyntax clazz, PropertyDeclarationSyntax property, AttributeSyntax propertyAttribute, BindingContext bindingContext)
+        PropertyBindingInfo CreatePropertyBindingInfo(SemanticModel semanticModel, ClassDeclarationSyntax clazz, PropertyDeclarationSyntax property, AttributeSyntax propertyAttribute)
         {
-            var elementType = string.Empty;
-            var elementPath = string.Empty;
-            var converterType = string.Empty;
-            var converterValueType = string.Empty;
-            var converterTargetType = string.Empty;
-            var targetPropertyName = string.Empty;
-            var targetPropertyType = string.Empty;
-            var targetPropertyValueType = string.Empty;
-            var bindingMode = BindingMode.OneWay;
+            var propertyInfo = CreatePropertyInfo(semanticModel, clazz, property, propertyAttribute);
+            var converterInfo = CreateConverterInfo(semanticModel, clazz, property, propertyAttribute);
+            var targetInfo = CreateTargetInfo(semanticModel, clazz, property, propertyAttribute);
+            var bindingMode = CreateBindingModeInfo(semanticModel, clazz, property, propertyAttribute);
 
-            for (int i = 0; i < propertyAttribute.ArgumentList.Arguments.Count; i++)
+            return new PropertyBindingInfo
             {
-                var args = propertyAttribute.ArgumentList.Arguments[i];
+                propertyInfo = propertyInfo,
+                converterInfo = converterInfo,
+                targetInfo = targetInfo,
+                bindingMode = bindingMode,
+            };
+        }
 
-                //当参数是字符串字面量时 说明是元素路径
-                if (args.Expression is LiteralExpressionSyntax arg)
-                {
-                    elementPath = arg.Token.ValueText;
-                }
-
-
-                (elementType, targetPropertyName, targetPropertyType, targetPropertyValueType) = CreateTarget(args, i, semanticModel, clazz, property);
-                (converterType, converterValueType, converterTargetType) = CreateConverter(args, i, semanticModel, clazz, property);
-
-                //当参数是成员访问表达式时 说明是绑定类型
-                if (args.Expression is MemberAccessExpressionSyntax memberAccess)
-                {
-                    bindingMode = Enum.Parse<BindingMode>(memberAccess.Name.ToString());
-                }
-            }
-
+        PropertyInfo CreatePropertyInfo(SemanticModel semanticModel, ClassDeclarationSyntax clazz, PropertyDeclarationSyntax property, AttributeSyntax attribute)
+        {
             var propertyName = property.Identifier.Text;
             var propertyType = property.Type.ToString();
             var isList = Utility.IsObservableList(clazz, property);
-
-            bindingContext.properties.Add(new BindingProperty
+            var location = property.GetLocation();
+            return new PropertyInfo
             {
                 name = propertyName,
-                type = new TypeInfo { fullName = propertyType, name = propertyType, isList = isList},
-                elementType = new TypeInfo { fullName = elementType, name = elementType},
-                converterType = new TypeInfo { fullName = converterType , name = converterType},
-                elementPath = elementPath,
-                bindingMode = bindingMode, 
-                elementPropertyName = targetPropertyName,
-            });
-
-            //Console.WriteLine($"property:{propertyName}  type:{propertyType} elementName:{elementPath}  elementType:{elementType} converterType:{converterType}");
+                type = propertyType,
+                isList = isList,
+            };
         }
 
-        (string elementType, string targetPropertyName, string targetPropertyType, string targetPropertyValueType) CreateTarget(AttributeArgumentSyntax args, int argsIndex, SemanticModel semanticModel, ClassDeclarationSyntax clazz, PropertyDeclarationSyntax property)
+        TargetInfo CreateTargetInfo(SemanticModel semanticModel, ClassDeclarationSyntax clazz, PropertyDeclarationSyntax property, AttributeSyntax attribute)
         {
-            //解析nameof  说明是绑定到某个element的某个属性
-            if (args.Expression is not InvocationExpressionSyntax invocationArgs || invocationArgs.Expression.ToString() != "nameof")
-            {
-                return default;
-            }
+            //解析nameof 说明是绑定到某个element的某个属性
+            var targetArgs = attribute.ArgumentList.Arguments
+                .FirstOrDefault((item) => item.Expression is InvocationExpressionSyntax invocation 
+                && invocation.Expression.ToString() == "nameof");
+            var targetInvocationArgs = targetArgs == null ? null : targetArgs.Expression as InvocationExpressionSyntax;
 
-            var a = invocationArgs.ArgumentList.Arguments[0];
-            var acc = a.ChildNodes().OfType<MemberAccessExpressionSyntax>().FirstOrDefault();
-            if(acc == null)
+            //当参数是字符串字面量时 说明是元素路径
+            var targetPathArgs = attribute.ArgumentList.Arguments
+                .FirstOrDefault((item) => item.Expression is LiteralExpressionSyntax);
+            var targetPathLiteralArgs = targetPathArgs == null ? null : targetPathArgs.Expression as LiteralExpressionSyntax;
+
+            if(targetInvocationArgs == null || targetPathLiteralArgs == null)
             {
-                return default;
+                return null;
             }
 
             string elementType = string.Empty;
@@ -213,7 +186,13 @@ namespace FUICompiler
             string targetPropertyType = string.Empty;
             string targetPropertyValueType = string.Empty;
 
-            var sm = semanticModel.GetSymbolInfo(acc.Expression);
+            var memberAccess = targetInvocationArgs.ArgumentList.Arguments[0].ChildNodes().OfType<MemberAccessExpressionSyntax>().FirstOrDefault();
+            if(memberAccess == null)
+            {
+                return null;
+            }
+
+            var sm = semanticModel.GetSymbolInfo(memberAccess.Expression);
             if(sm.Symbol is ITypeSymbol typeSymbol)
             {
                 elementType = typeSymbol.ToString();
@@ -226,8 +205,8 @@ namespace FUICompiler
                 //targetPropertyType = propertySymbol.Type.ToString();
             }
             
-            var typeInfo = semanticModel.GetTypeInfo(acc);
-            targetPropertyName = acc.Name.ToString();
+            var typeInfo = semanticModel.GetTypeInfo(memberAccess);
+            targetPropertyName = memberAccess.Name.ToString();
             targetPropertyType = typeInfo.Type.ToString();
             foreach(var @interface in typeInfo.Type.AllInterfaces)
             {
@@ -237,55 +216,58 @@ namespace FUICompiler
                 }
             }
 
-            Console.WriteLine((elementType, targetPropertyName, targetPropertyType, targetPropertyValueType));
-
-            return (elementType, targetPropertyName, targetPropertyType, targetPropertyValueType);
+            return new TargetInfo
+            {
+                type = elementType,
+                path = targetPathLiteralArgs.Token.ValueText,
+                propertyType = targetPropertyType,
+                propertyName = targetPropertyName,
+                propertyValueType = targetPropertyValueType,
+            };
         }
 
-        (string type, string valueType, string targetType) CreateConverter(AttributeArgumentSyntax args, int argsIndex, SemanticModel semanticModel, ClassDeclarationSyntax clazz, PropertyDeclarationSyntax property)
+        ConverterInfo CreateConverterInfo(SemanticModel semanticModel, ClassDeclarationSyntax clazz, PropertyDeclarationSyntax property, AttributeSyntax attribute)
         {
             //当参数是类型时 说明转换器类型
-            if (args.Expression is not TypeOfExpressionSyntax typeArg)
+            var args = attribute.ArgumentList.Arguments.FirstOrDefault((item) => item.Expression is TypeOfExpressionSyntax);
+
+            if(args == null)
             {
-                return default;
+                return null;
             }
 
-            //当有可选参数 且参数名为converterType时 说明是转换器类型
-            if (args.NameColon != null && args.NameColon.Name.ToString() == "converterMode")
+            var typeArgs = args.Expression as TypeOfExpressionSyntax;
+            var typeInfo = semanticModel.GetTypeInfo(typeArgs.Type);
+
+            if (!typeInfo.Type.IsValueConverter(out var valueType, out var targetType))
             {
-                var typeInfo = semanticModel.GetTypeInfo(typeArg.Type);
-                if (!typeInfo.Type.IsValueConverter(out var valueType, out var targetType))
+                Message.Message.WriteMessage(Message.MessageType.Log, new Message.LogMessage
                 {
-                    PrintNotValueConverter(clazz.Identifier.Text, property.Identifier.Text, typeInfo.Type.Name);
-                    return default;
-                }
-
-                return (typeInfo.Type.Name, valueType.Name, targetType.Name);
+                    Level = Message.LogLevel.Error,
+                    Message = $"{clazz.Identifier.Text}.{property.Identifier.Text}[{typeInfo.Type.Name}] is not {Utility.ValueConverterFullName}<,>"
+                });
+                return null;
             }
 
-            //当有多个参数且都不是可选参数时 按照顺序分别为元素类型和转换器类型
-            if (argsIndex == 2)
+            return new ConverterInfo
             {
-                var typeInfo = semanticModel.GetTypeInfo(typeArg.Type);
-                if (!typeInfo.Type.IsValueConverter(out var valueType, out var targetType))
-                {
-                    PrintNotValueConverter(clazz.Identifier.Text, property.Identifier.Text, typeInfo.Type.Name);
-                    return default;
-                }
-
-                return (typeInfo.Type.Name, valueType.Name, targetType.Name);
-            }
-
-            return default;
+                type = typeInfo.Type.Name,
+                sourceType = valueType.Name,
+                targetType = targetType.Name
+            };
         }
 
-        void PrintNotValueConverter(string clazz, string property, string converter)
+        BindingMode CreateBindingModeInfo(SemanticModel semanticModel, ClassDeclarationSyntax clazz, PropertyDeclarationSyntax property, AttributeSyntax attribute)
         {
-            Message.Message.WriteMessage(Message.MessageType.Log, new Message.LogMessage
+            //当参数是成员访问表达式时 说明是绑定类型
+            var args = attribute.ArgumentList.Arguments.FirstOrDefault((item) => item is MemberAccessExpressionSyntax);
+            if(args == null)
             {
-                Level = Message.LogLevel.Error,
-                Message = $"{clazz}.{property}[{converter}] is not {Utility.ValueConverterFullName}<,>"
-            });
+                return BindingMode.OneWay;
+            }
+
+            var memberAccess = args.Expression as MemberAccessExpressionSyntax;
+            return Enum.Parse<BindingMode>(memberAccess.Name.ToString());
         }
 
         /// <summary>
@@ -294,8 +276,21 @@ namespace FUICompiler
         /// <param name="property">属性定义文件</param>
         /// <param name="commandAttribute">属性特性</param>
         /// <param name="bindingContext">当前绑定上下文配置</param>
-        void CreateCommand(ClassDeclarationSyntax clazz, string methodName, AttributeSyntax commandAttribute, BindingContext bindingContext)
+        CommandBindingInfo CreateCommand(SemanticModel semanticModel, ClassDeclarationSyntax clazz, MemberDeclarationSyntax member, AttributeSyntax commandAttribute)
         {
+             
+            //获取方法命令绑定
+            if(member is MethodDeclarationSyntax methodDeclaration)
+            {
+                var methodName = methodDeclaration.Identifier.Text;
+            }
+
+            if(member is EventFieldDeclarationSyntax eventFieldDeclaration)
+            {
+                var methodName = Utility.GetEventMethodName(eventFieldDeclaration.Declaration.Variables.ToString());
+            }
+            
+            
             var elementType = string.Empty;
             var elementPath = string.Empty;
             var targetPropertyName = string.Empty;
@@ -320,14 +315,6 @@ namespace FUICompiler
                     targetPropertyName = expression.Substring(lastDotIndex + 1);
                 }
             }
-
-            bindingContext.commands.Add(new BindingCommand
-            {
-                name = methodName,
-                elementType = new TypeInfo { fullName = elementType, name = elementType },
-                elementPath = elementPath,
-                elementPropertyName = targetPropertyName,
-            });
         }
     }
 }

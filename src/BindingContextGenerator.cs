@@ -20,7 +20,7 @@ namespace FUICompiler
             var result = new List<Source?>();
             foreach (var file in Directory.GetFiles(configPath, $"*{configExtension}"))
             {
-                var config = JsonConvert.DeserializeObject<BindingConfig>(File.ReadAllText(file));
+                var config = JsonConvert.DeserializeObject<BindingInfo>(File.ReadAllText(file));
 
                 Generate(config, ref result);
             }
@@ -34,7 +34,7 @@ namespace FUICompiler
             return type.Replace(".", "_");
         }
 
-        internal void Generate(BindingConfig config, ref List<Source?> result, IEnumerable<string> usings = null, string @namespace = null)
+        internal void Generate(BindingInfo config, ref List<Source?> result, IEnumerable<string> usings = null, string @namespace = null)
         {
             foreach (var bindingContext in config.contexts)
             {
@@ -49,8 +49,8 @@ namespace FUICompiler
                 //为每个上下文生成对应的绑定代码
                 var bindingItemsBuilder = new StringBuilder();
                 var unbindingItemsBuilder = new StringBuilder();
-                var defaultViewModelType = bindingContext.type;
-                var vmName = GetFormattedType(bindingContext.type);
+                var defaultViewModelType = bindingContext.viewModelName;
+                var vmName = GetFormattedType(bindingContext.viewModelName);
 
                 //为每个属性生成对应的委托 并添加绑定代码和解绑代码
                 foreach (var property in bindingContext.properties)
@@ -86,12 +86,12 @@ namespace FUICompiler
                 }
 
                 //组装绑定代码
-                bindingBuilder.AppendLine(BindingTemplate.Replace(ViewModelTypeMark, bindingContext.type)
+                bindingBuilder.AppendLine(BindingTemplate.Replace(ViewModelTypeMark, bindingContext.viewModelName)
                     .Replace(ViewModelNameMark, vmName)
                     .Replace(BindingItemsMark, bindingItemsBuilder.ToString()));
 
                 //组装解绑代码
-                unbindingBuilder.AppendLine(BindingTemplate.Replace(ViewModelTypeMark, bindingContext.type)
+                unbindingBuilder.AppendLine(BindingTemplate.Replace(ViewModelTypeMark, bindingContext.viewModelName)
                     .Replace(ViewModelNameMark, vmName)
                     .Replace(BindingItemsMark, unbindingItemsBuilder.ToString()));
 
@@ -128,7 +128,7 @@ namespace FUICompiler
         }
 
         //构建普通属性绑定
-        void BuildNormalPropertyBinding(BindingContext bindingContext, string vmName, BindingProperty property, 
+        void BuildNormalPropertyBinding(ContextBindingInfo bindingContext, string vmName, PropertyBindingInfo property, 
             ref HashSet<string> propertyDelegates,
             ref HashSet<string> converterTypes,
             ref StringBuilder bindingFunctionBuilder, 
@@ -139,7 +139,7 @@ namespace FUICompiler
             propertyDelegates.Add(delegateName);
 
             //构建值转换
-            var convert = BuildConvert(bindingContext.type, property);
+            var convert = BuildConvert(bindingContext.viewModelName, property);
 
             //如果这个属性是List则生成List绑定代码
             var listBinding = property.type.isList ? ListBindingTemplate.Replace(ElementTypeMark, property.elementType.ToTypeString()) : string.Empty;
@@ -175,7 +175,7 @@ namespace FUICompiler
         /// <summary>
         /// 构建值转换器
         /// </summary>
-        string BuildConvert(string viewModelType, BindingProperty property)
+        string BuildConvert(string viewModelType, PropertyBindingInfo property)
         {
             var convertBuilder = new StringBuilder();
 
@@ -232,7 +232,7 @@ namespace FUICompiler
         /// <param name="bindingItemBuilder">绑定代码构建器</param>
         /// <param name="unbindingItemBuilder">解绑代码构建器</param>
         /// <param name="functionBuilder">方法构建器</param>
-        void BuildV2VMBinding(string vmName, BindingProperty property,
+        void BuildV2VMBinding(string vmName, PropertyBindingInfo property,
             ref StringBuilder bindingItemBuilder,
             ref StringBuilder unbindingItemBuilder,
             ref StringBuilder functionBuilder)
@@ -288,7 +288,7 @@ namespace FUICompiler
         /// <param name="bindingItemBuilder">绑定代码构建器</param>
         /// <param name="unbindingItemBuilder">解绑代码构建器</param>
         /// <param name="functionBuilder">方法构建器</param>
-        void BuildCommandBinding(string vmName, BindingCommand command,
+        void BuildCommandBinding(string vmName, CommandBindingInfo command,
             ref StringBuilder bindingItemBuilder,
             ref StringBuilder unbindingItemBuilder,
             ref StringBuilder functionBuilder)
