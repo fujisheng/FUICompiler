@@ -28,148 +28,108 @@ namespace FUICompiler
             return result.ToArray();
         }
 
-        //将类型名转换成合法的C#命名
-        static string GetFormattedType(string type)
-        {
-            return type.Replace(".", "_");
-        }
-
         internal void Generate(BindingInfo config, ref List<Source?> result, IEnumerable<string> usings = null, string @namespace = null)
         {
             foreach (var bindingContext in config.contexts)
             {
-                var code = Template.Replace(ViewNameMark, config.viewName);
-
                 var bindingBuilder = new StringBuilder();
                 var unbindingBuilder = new StringBuilder();
                 HashSet<string> converterTypes = new HashSet<string>();
-                HashSet<string> propertyDelegates = new HashSet<string>();
-                var bindingFunctionsBuilder = new StringBuilder();
+
+                var functionBuilder = new StringBuilder();
 
                 //为每个上下文生成对应的绑定代码
                 var bindingItemsBuilder = new StringBuilder();
                 var unbindingItemsBuilder = new StringBuilder();
-                var defaultViewModelType = bindingContext.viewModelName;
-                var vmName = GetFormattedType(bindingContext.viewModelName);
 
                 //为每个属性生成对应的委托 并添加绑定代码和解绑代码
                 foreach (var property in bindingContext.properties)
                 {
-                    BuildNormalPropertyBinding(bindingContext, vmName, property,
-                            ref propertyDelegates, //属性对应的委托
-                            ref converterTypes, //转换器类型
-                            ref bindingFunctionsBuilder, //属性对应的绑定方法
-                            ref bindingItemsBuilder, //属性对应的绑定代码
-                            ref unbindingItemsBuilder);//属性对应的解绑代码
+                    BuildNormalPropertyBinding(bindingContext, property, ref functionBuilder, ref bindingItemsBuilder, ref unbindingItemsBuilder);
 
                     //如果是列表 需要单独构建ListUnbinding代码
-                    if (property.type.isList)
+                    if (property.propertyInfo.isList)
                     {
-                        unbindingItemsBuilder.AppendLine(ListUnbindingTemplate
-                            .Replace(ElementTypeMark, property.elementType.ToTypeString())
-                            .Replace(ViewModelNameMark, vmName)
-                            .Replace(PropertyNameMark, property.name)
-                            .Replace(ElementPathMark, property.elementPath));
+                        unbindingItemsBuilder.AppendLine(BuildListUnbindingCode(bindingContext, property));
                     }
 
                     //如果是双向绑定需要构建从View到ViewModel的绑定
                     if(property.bindingMode.HasFlag(BindingMode.OneWayToSource))
                     {
-                        BuildV2VMBinding(vmName, property, ref bindingItemsBuilder, ref unbindingItemsBuilder, ref bindingFunctionsBuilder);
+                        BuildV2VMBinding(bindingContext, property, ref bindingItemsBuilder, ref unbindingItemsBuilder, ref functionBuilder);
+                    }
+
+                    //如果有转换器则需要记录以便生成转换器构造代码
+                    if (property.converterInfo != null)
+                    {
+                        converterTypes.Add(property.converterInfo.type);
                     }
                 }
 
                 //为命令生成绑定和解绑代码
                 foreach(var command in bindingContext.commands)
                 {
-                    BuildCommandBinding(vmName, command, ref bindingItemsBuilder, ref unbindingItemsBuilder, ref  bindingFunctionsBuilder);
+                    BuildCommandBinding(bindingContext, command, ref bindingItemsBuilder, ref unbindingItemsBuilder, ref  functionBuilder);
                 }
 
                 //组装绑定代码
-                bindingBuilder.AppendLine(BindingTemplate.Replace(ViewModelTypeMark, bindingContext.viewModelName)
-                    .Replace(ViewModelNameMark, vmName)
-                    .Replace(BindingItemsMark, bindingItemsBuilder.ToString()));
+                bindingBuilder.AppendLine(BuildBindingsCode(bindingContext, bindingItemsBuilder.ToString()));
 
                 //组装解绑代码
-                unbindingBuilder.AppendLine(BindingTemplate.Replace(ViewModelTypeMark, bindingContext.viewModelName)
-                    .Replace(ViewModelNameMark, vmName)
-                    .Replace(BindingItemsMark, unbindingItemsBuilder.ToString()));
-
-                //组装所有的绑定代码
-                code = code.Replace(BindingMark, bindingBuilder.ToString())
-                    .Replace(UnbindingMark, unbindingBuilder.ToString())
-                    .Replace(PropertyChangedFunctionsMark, bindingFunctionsBuilder.ToString())
-                    .Replace(DefaultViewModelTypeMark, defaultViewModelType)
-                    .Replace(ViewModelNameMark, vmName);
+                unbindingBuilder.AppendLine(BuildBindingsCode(bindingContext, unbindingItemsBuilder.ToString()));
 
                 //生成所有的转换器构造代码
                 var convertersBuilder = new StringBuilder();
                 BuildConverterCostructor(converterTypes, ref convertersBuilder);
-                code = code.Replace(ConvertersMark, convertersBuilder.ToString());
 
                 //添加using
                 var usingBuilder = new StringBuilder();
                 BuildUsings(usings, ref usingBuilder);
-                code = code.Replace(UsingMark, usingBuilder.ToString());
 
                 //添加Namespace
                 var @namespaceName = string.IsNullOrEmpty(@namespace) ? DefaultNamespace : @namespace;
-                code = code.Replace(NamespaceMark, @namespaceName);
 
-                //添加文件头
-                code = code.Replace(FileHeadMark, Utility.FileHead);
+                //组装所有的绑定代码
+                var code = BuildContextCode(bindingContext, config, usingBuilder.ToString(), @namespaceName, convertersBuilder.ToString(), bindingBuilder.ToString(), unbindingBuilder.ToString(), functionBuilder.ToString());
 
                 //格式化代码
                 code = Utility.NormalizeCode(code);
-                //Console.WriteLine(code);
-                //Console.WriteLine($"generate data binding for {vmName}:{config.viewName}");
-                result.Add(new Source($"{vmName}_{config.viewName}.DataBinding.g", code));
+
+                result.Add(new Source($"{bindingContext.viewModelType.ToCSharpName()}_{config.viewName}.DataBinding.g", code));
             }
         }
 
         //构建普通属性绑定
-        void BuildNormalPropertyBinding(ContextBindingInfo bindingContext, string vmName, PropertyBindingInfo property, 
-            ref HashSet<string> propertyDelegates,
-            ref HashSet<string> converterTypes,
-            ref StringBuilder bindingFunctionBuilder, 
+        void BuildNormalPropertyBinding(ContextBindingInfo bindingContext, PropertyBindingInfo property,
+            ref StringBuilder functionBuilder, 
             ref StringBuilder bindingItemsBuilder, 
             ref StringBuilder unbindingItemsBuilder)
         {
-            var delegateName = Utility.GetPropertyChangedDelegateName(property.name);
-            propertyDelegates.Add(delegateName);
+            var delegateName = Utility.GetPropertyChangedDelegateName(property.propertyInfo.name);
 
             //构建值转换
-            var convert = BuildConvert(bindingContext.viewModelName, property);
+            var convert = BuildConvert(bindingContext.viewModelType, property);
 
             //如果这个属性是List则生成List绑定代码
-            var listBinding = property.type.isList ? ListBindingTemplate.Replace(ElementTypeMark, property.elementType.ToTypeString()) : string.Empty;
+            var listBinding = string.Empty;
+            if (property.propertyInfo.isList)
+            {
+                listBinding = BuildListBindingCode(property);
+            }
 
             //为属性生成对应的绑定方法
-            var propertyChangedFunctionName = $"PropertyChanged__{vmName}_{property.name}__{property.elementPath.ToCSharpName()}_{property.elementType.ToTypeString().ToCSharpName()}_{property.elementPropertyName}";
+            var vmName = bindingContext.viewModelType.ToCSharpName();
+            var propertyTargetUniqueName = GetPropertyTargetUniqueName(bindingContext, property);
+            var propertyChangedFunctionName = $"PropertyChanged__{propertyTargetUniqueName}";
 
             //构建属性绑定代码
-            bindingFunctionBuilder.AppendLine(BindingItemFunctionTemplate
-                .Replace(PropertyChangedFunctionNameMark, propertyChangedFunctionName)
-                .Replace(PropertyTypeMark, property.type.ToTypeString())
-
-                .Replace(ConvertMark, convert)
-
-                .Replace(ElementTypeMark, property.elementType.ToTypeString())
-                .Replace(ElementPathMark, property.elementPath)
-
-                .Replace(ListBindingMark, listBinding)
-
-                .Replace(ViewModelTypeMark, vmName)
-                .Replace(PropertyNameMark, property.name)
-                .Replace(ElementPropertyNameMark, property.elementPropertyName));
+            functionBuilder.AppendLine(BuildPropertyChangedFunctionCode(propertyChangedFunctionName, convert, listBinding, property));
 
             //生成属性绑定代码
             bindingItemsBuilder.AppendLine($"{vmName}.{delegateName} += {propertyChangedFunctionName};");
 
             //生成属性解绑代码
             unbindingItemsBuilder.AppendLine($"{vmName}.{delegateName} -= {propertyChangedFunctionName};");
-
-            converterTypes.Add(property.converterType.ToTypeString());
         }
 
         /// <summary>
@@ -179,9 +139,9 @@ namespace FUICompiler
         {
             var convertBuilder = new StringBuilder();
 
-            if (!property.converterType.IsNull())
+            if (property.converterInfo != null)
             {
-                convertBuilder.AppendLine($"var convertedValue = {GetFormattedType(property.converterType.ToTypeString())}.Convert(@value);");
+                convertBuilder.AppendLine($"var convertedValue = {property.converterInfo.type.ToCSharpName()}.Convert(@value);");
             }
             else
             {
@@ -199,7 +159,7 @@ namespace FUICompiler
                 {
                     continue;
                 }
-                convertersBuilder.AppendLine($"{converterType} {GetFormattedType(converterType)} = new {converterType}();");
+                convertersBuilder.AppendLine($"{converterType} {converterType.ToCSharpName()} = new {converterType}();");
             }
         }
 
@@ -232,52 +192,27 @@ namespace FUICompiler
         /// <param name="bindingItemBuilder">绑定代码构建器</param>
         /// <param name="unbindingItemBuilder">解绑代码构建器</param>
         /// <param name="functionBuilder">方法构建器</param>
-        void BuildV2VMBinding(string vmName, PropertyBindingInfo property,
+        void BuildV2VMBinding(ContextBindingInfo contextInfo, PropertyBindingInfo property,
             ref StringBuilder bindingItemBuilder,
             ref StringBuilder unbindingItemBuilder,
             ref StringBuilder functionBuilder)
         {
-            var bindingFunctionName = $"BindingV2VM__{vmName}_{property.name}__{property.elementPath.ToCSharpName()}_{property.elementType.ToTypeString().ToCSharpName()}_{property.elementPropertyName}";
-            var unbindingFunctionName = $"UnbindingV2VM__{vmName}_{property.name}__{property.elementPath.ToCSharpName()}_{property.elementType.ToTypeString().ToCSharpName()}_{property.elementPropertyName}";
+            var vmName = contextInfo.viewModelType.ToCSharpName();
+            var propertyTargetUniqueName = GetPropertyTargetUniqueName(contextInfo, property);
+            var bindingFunctionName = $"BindingV2VM__{propertyTargetUniqueName}";
+            var unbindingFunctionName = $"UnbindingV2VM__{propertyTargetUniqueName}";
             bindingItemBuilder.AppendLine($"{bindingFunctionName}({vmName});");
             unbindingItemBuilder.AppendLine($"{unbindingFunctionName}({vmName});");
 
-            var invocationName = $"V2VMInvocation__{vmName}_{property.name}__{property.elementPath.ToCSharpName()}_{property.elementType.ToTypeString().ToCSharpName()}_{property.elementPropertyName}";
+            var invocationName = $"V2VMInvocation__{propertyTargetUniqueName}";
 
-            var invocation = $"System.Delegate {invocationName};";
+            var invocation = BuildV2VMInvocationFunctionCode(contextInfo, property, invocationName);
 
-            var tempBuilder = new StringBuilder();
-            
-            tempBuilder.AppendLine(V2VMBindingFunctionTemplate
-                .Replace(ViewModelTypeMark, vmName)
-                .Replace(PropertyNameMark, property.name)
-                .Replace(ViewModelNameMark, vmName)
-                .Replace(PropertyTypeMark, property.type.ToTypeString())
-                .Replace(ElementTypeMark, property.elementType.ToTypeString())
-                .Replace(ElementPathMark, property.elementPath)
-                .Replace(ElementPropertyNameMark, property.elementPropertyName));
+            var bindingOperate = BuildV2VMBindingOperateCode(invocationName, property);
+            var unbindingOperate = BuildV2VMUnbindingOperateCode(invocationName, property);
 
-            var temp = tempBuilder.ToString();
-
-            var bindingOperate = V2VMBindingTemplate
-                .Replace(ElementPropertyNameMark, property.elementPropertyName)
-                .Replace(ViewModelNameMark, vmName)
-                .Replace(PropertyNameMark, property.name)
-                .Replace(V2VMBindingInvocationNameMark, invocationName);
-
-            functionBuilder.AppendLine(temp
-                .Replace(InvocationMark, invocation)
-                .Replace(V2VMBindingFunctionNameMark, bindingFunctionName)
-                .Replace(V2VMOperateMark, bindingOperate));
-
-            var unbindingOperate = V2VMUnbindingTemplate
-                .Replace(ElementPropertyNameMark, property.elementPropertyName)
-                .Replace(V2VMBindingInvocationNameMark, invocationName);
-            functionBuilder.AppendLine(temp
-                .Replace(InvocationMark, "")
-                .Replace(V2VMBindingFunctionNameMark, unbindingFunctionName)
-                .Replace(V2VMOperateMark, unbindingOperate));
-
+            functionBuilder.AppendLine(BuildV2VMBindingFunctionCode(contextInfo, property, invocation, bindingFunctionName, bindingOperate));
+            functionBuilder.AppendLine(BuildV2VMBindingFunctionCode(contextInfo, property, string.Empty, unbindingFunctionName, unbindingOperate));
         }
 
         /// <summary>
@@ -288,46 +223,24 @@ namespace FUICompiler
         /// <param name="bindingItemBuilder">绑定代码构建器</param>
         /// <param name="unbindingItemBuilder">解绑代码构建器</param>
         /// <param name="functionBuilder">方法构建器</param>
-        void BuildCommandBinding(string vmName, CommandBindingInfo command,
+        void BuildCommandBinding(ContextBindingInfo contextInfo, CommandBindingInfo command,
             ref StringBuilder bindingItemBuilder,
             ref StringBuilder unbindingItemBuilder,
             ref StringBuilder functionBuilder)
         {
-            var bindingFunctionName = $"BindingCommand__{vmName}_{command.name}__{command.elementPath.ToCSharpName()}_{command.elementType.ToTypeString().ToCSharpName()}_{command.elementPropertyName}";
-            var unbindingFunctionName = $"UnbindingCommand__{vmName}_{command.name}__{command.elementPath.ToCSharpName()}_{command.elementType.ToTypeString().ToCSharpName()}_{command.elementPropertyName}";
+            var vmName = contextInfo.viewModelType.ToCSharpName();
+            var commandTargetUniqueName = GetCommandTargetUniqueName(contextInfo, command);
+            var bindingFunctionName = $"BindingCommand__{commandTargetUniqueName}";
+            var unbindingFunctionName = $"UnbindingCommand__{commandTargetUniqueName}";
+
             bindingItemBuilder.AppendLine($"{bindingFunctionName}({vmName});");
             unbindingItemBuilder.AppendLine($"{unbindingFunctionName}({vmName});");
 
-            var tempBuilder = new StringBuilder();
-            tempBuilder.AppendLine(CommandBindingFunctionTemplate
-                .Replace(ViewModelNameMark, vmName)
-                .Replace(ViewModelTypeMark, vmName)
-                .Replace(ElementTypeMark, command.elementType.ToTypeString())
-                .Replace(ElementPathMark, command.elementPath));
-            var temp = tempBuilder.ToString();
+            var bindingOperate = BuildCommandBindingOperateCode(contextInfo, command);
+            var unbindingOperate = BuildCommandUnbindingOperateCode(contextInfo, command);
 
-            var bindingOperate = CommandBindingTemplate
-                .Replace(ElementPropertyNameMark, command.elementPropertyName)
-                .Replace(ViewModelNameMark, vmName)
-                .Replace(MethodNameMark, command.name);
-
-            var unbindingOperate = CommandUnbindingTemplate
-                .Replace(ElementPropertyNameMark, command.elementPropertyName)
-                .Replace(ViewModelNameMark, vmName)
-                .Replace(MethodNameMark, command.name);
-
-            functionBuilder.AppendLine(temp
-                .Replace(CommandBindingFunctionNameMark, bindingFunctionName)
-                .Replace(CommandOperateMark, bindingOperate));
-
-            functionBuilder.AppendLine(temp
-                .Replace(CommandBindingFunctionNameMark , unbindingFunctionName)
-                .Replace(CommandOperateMark , unbindingOperate));
-        }
-
-        string GetFormatName(string path)
-        {
-            return path.Replace(".", "_").Replace("/", "_").Replace(" ", "_");
+            functionBuilder.AppendLine(BuildCommandBindingFunctionCode(contextInfo, command, bindingFunctionName, bindingOperate));
+            functionBuilder.AppendLine(BuildCommandBindingFunctionCode(contextInfo, command, unbindingFunctionName, unbindingOperate));
         }
     }
 }

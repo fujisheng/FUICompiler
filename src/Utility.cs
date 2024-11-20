@@ -489,11 +489,6 @@ namespace FUICompiler
             return Directory.CreateDirectory(path);
         }
 
-        public static bool IsNull(this TypeInfo typeInfo)
-        {
-            return typeInfo == null || typeInfo.IsNull();
-        }
-
         public const string ValueConverterFullName = "FUI.IValueConverter";
         /// <summary>
         /// 判断一个类型是否是值转换器

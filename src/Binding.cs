@@ -40,6 +40,27 @@
         /// 是否是列表类型
         /// </summary>
         public bool isList;
+
+        /// <summary>
+        /// 位置信息
+        /// </summary>
+        public LocationInfo location;
+    }
+
+    /// <summary>
+    /// 位置信息
+    /// </summary>
+    public class LocationInfo
+    {
+        /// <summary>
+        /// 文件路径
+        /// </summary>
+        public string path;
+
+        /// <summary>
+        /// 行数
+        /// </summary>
+        public int line;
     }
 
     /// <summary>
@@ -61,6 +82,11 @@
         /// 转换器目标类型
         /// </summary>
         public string targetType;
+
+        /// <summary>
+        /// 位置信息
+        /// </summary>
+        public LocationInfo location;
     }
 
     /// <summary>
@@ -94,6 +120,52 @@
         public string propertyValueType;
     }
 
+    public class CommandInfo
+    {
+        /// <summary>
+        /// 名字
+        /// </summary>
+        public string name;
+
+        /// <summary>
+        /// 参数
+        /// </summary>
+        public List<string> parameters;
+
+        /// <summary>
+        /// 是否是event
+        /// </summary>
+        public bool isEvent;
+
+        /// <summary>
+        /// 在源文件中的位置信息
+        /// </summary>
+        public LocationInfo location;
+    }
+
+    public class CommandTargetInfo
+    {
+        /// <summary>
+        /// 目标路径
+        /// </summary>
+        public string path;
+
+        /// <summary>
+        /// 类型
+        /// </summary>
+        public string type;
+
+        /// <summary>
+        /// 目标属性名字
+        /// </summary>
+        public string propertyName;
+
+        /// <summary>
+        /// 参数类型
+        /// </summary>
+        public List<string> parameters;
+    }
+
     /// <summary>
     /// 属性绑定信息
     /// </summary>
@@ -111,8 +183,8 @@
     /// </summary>
     public class CommandBindingInfo
     {
-        public PropertyInfo propertyInfo;
-        public TargetInfo targetInfo;
+        public CommandInfo commandInfo;
+        public CommandTargetInfo targetInfo;
     }
 
     /// <summary>
@@ -120,7 +192,7 @@
     /// </summary>
     public class ContextBindingInfo
     {
-        public string viewModelName;
+        public string viewModelType;
         public List<PropertyBindingInfo> properties = new List<PropertyBindingInfo>();
         public List<CommandBindingInfo> commands = new List<CommandBindingInfo>();
     }

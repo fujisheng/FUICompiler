@@ -1,12 +1,7 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.Extensions.Logging;
 
-using System;
-using System.Diagnostics.Contracts;
 using System.Reflection;
-
-using TypeInfo = Microsoft.CodeAnalysis.TypeInfo;
 
 namespace FUICompiler
 {
@@ -60,16 +55,17 @@ namespace FUICompiler
         }
 
         /// <summary>
-        /// 创建一个绑定上下文文配置
+        /// 创建一个绑定上下文配置
         /// </summary>
-        /// <param name="bindingConfig">绑定配置</param>
-        /// <param name="classDeclaration">类定义</param>
-        /// <param name="attribute">绑定特性</param>
+        /// <param name="bindingConfig">配置</param>
+        /// <param name="semanticModel">语义模型</param>
+        /// <param name="classDeclaration">类定义节点</param>
+        /// <param name="attribute">特性节点</param>
         void CreateContext(BindingInfo bindingConfig, SemanticModel semanticModel, ClassDeclarationSyntax classDeclaration, AttributeSyntax attribute)
         {
             var bindingContext = new ContextBindingInfo();
 
-            bindingContext.viewModelName = classDeclaration.Identifier.Text;
+            bindingContext.viewModelType = classDeclaration.Identifier.Text;
 
             if(attribute == null)
             {
@@ -102,7 +98,10 @@ namespace FUICompiler
                 foreach (var propertyAttribute in propertyAttributes)
                 {
                    var propertyBindingInfo = CreatePropertyBindingInfo(semanticModel, classDeclaration, property, propertyAttribute);
-                    bindingContext.properties.Add(propertyBindingInfo);
+                    if (propertyBindingInfo != null)
+                    {
+                        bindingContext.properties.Add(propertyBindingInfo);
+                    }
                 }
             }
 
@@ -117,6 +116,10 @@ namespace FUICompiler
                 foreach(var commandAttribute  in commandAttributes)
                 {
                     var commandBindingInfo = CreateCommand(semanticModel, classDeclaration, member, commandAttribute);
+                    if(commandBindingInfo != null)
+                    {
+                        bindingContext.commands.Add(commandBindingInfo);
+                    }
                 }
             }
 
@@ -130,15 +133,22 @@ namespace FUICompiler
         /// <summary>
         /// 创建属性绑定配置文件
         /// </summary>
-        /// <param name="property">属性定义文件</param>
-        /// <param name="propertyAttribute">属性特性</param>
-        /// <param name="bindingContext">当前绑定上下文配置</param>
+        /// <param name="semanticModel">语义模型</param>
+        /// <param name="clazz">类定义节点</param>
+        /// <param name="property">属性定义节点</param>
+        /// <param name="propertyAttribute">属性特性节点</param>
+        /// <returns></returns>
         PropertyBindingInfo CreatePropertyBindingInfo(SemanticModel semanticModel, ClassDeclarationSyntax clazz, PropertyDeclarationSyntax property, AttributeSyntax propertyAttribute)
         {
             var propertyInfo = CreatePropertyInfo(semanticModel, clazz, property, propertyAttribute);
             var converterInfo = CreateConverterInfo(semanticModel, clazz, property, propertyAttribute);
             var targetInfo = CreateTargetInfo(semanticModel, clazz, property, propertyAttribute);
             var bindingMode = CreateBindingModeInfo(semanticModel, clazz, property, propertyAttribute);
+
+            if(propertyInfo == null || targetInfo == null)
+            {
+                return null;
+            }
 
             return new PropertyBindingInfo
             {
@@ -149,20 +159,43 @@ namespace FUICompiler
             };
         }
 
+        /// <summary>
+        /// 创建属性信息
+        /// </summary>
+        /// <param name="semanticModel">语义模型</param>
+        /// <param name="clazz">类定义节点</param>
+        /// <param name="property">属性定义节点</param>
+        /// <param name="attribute">属性特性节点</param>
+        /// <returns></returns>
         PropertyInfo CreatePropertyInfo(SemanticModel semanticModel, ClassDeclarationSyntax clazz, PropertyDeclarationSyntax property, AttributeSyntax attribute)
         {
             var propertyName = property.Identifier.Text;
             var propertyType = property.Type.ToString();
             var isList = Utility.IsObservableList(clazz, property);
-            var location = property.GetLocation();
+            var lineSpan = property.GetLocation().GetLineSpan();
+            var location = new LocationInfo
+            {
+                line = lineSpan.Span.End.Line,
+                path = lineSpan.Path,
+            };
+
             return new PropertyInfo
             {
                 name = propertyName,
                 type = propertyType,
                 isList = isList,
+                location = location,
             };
         }
 
+        /// <summary>
+        /// 创建目标信息
+        /// </summary>
+        /// <param name="semanticModel">语义模型</param>
+        /// <param name="clazz">类定义节点</param>
+        /// <param name="property">属性定义节点</param>
+        /// <param name="attribute">属性特性节点</param>
+        /// <returns></returns>
         TargetInfo CreateTargetInfo(SemanticModel semanticModel, ClassDeclarationSyntax clazz, PropertyDeclarationSyntax property, AttributeSyntax attribute)
         {
             //解析nameof 说明是绑定到某个element的某个属性
@@ -226,6 +259,14 @@ namespace FUICompiler
             };
         }
 
+        /// <summary>
+        /// 创建值转换器信息
+        /// </summary>
+        /// <param name="semanticModel">语义模型</param>
+        /// <param name="clazz">类定义节点</param>
+        /// <param name="property">属性定义节点</param>
+        /// <param name="attribute">属性特性节点</param>
+        /// <returns></returns>
         ConverterInfo CreateConverterInfo(SemanticModel semanticModel, ClassDeclarationSyntax clazz, PropertyDeclarationSyntax property, AttributeSyntax attribute)
         {
             //当参数是类型时 说明转换器类型
@@ -257,10 +298,18 @@ namespace FUICompiler
             };
         }
 
+        /// <summary>
+        /// 创建绑定模式信息
+        /// </summary>
+        /// <param name="semanticModel">语义模型</param>
+        /// <param name="clazz">类定义节点</param>
+        /// <param name="property">属性定义节点</param>
+        /// <param name="attribute">属性特性节点</param>
+        /// <returns></returns>
         BindingMode CreateBindingModeInfo(SemanticModel semanticModel, ClassDeclarationSyntax clazz, PropertyDeclarationSyntax property, AttributeSyntax attribute)
         {
             //当参数是成员访问表达式时 说明是绑定类型
-            var args = attribute.ArgumentList.Arguments.FirstOrDefault((item) => item is MemberAccessExpressionSyntax);
+            var args = attribute.ArgumentList.Arguments.FirstOrDefault((item) => item.Expression is MemberAccessExpressionSyntax);
             if(args == null)
             {
                 return BindingMode.OneWay;
@@ -273,23 +322,48 @@ namespace FUICompiler
         /// <summary>
         /// 创建命令绑定配置文件
         /// </summary>
-        /// <param name="property">属性定义文件</param>
-        /// <param name="commandAttribute">属性特性</param>
-        /// <param name="bindingContext">当前绑定上下文配置</param>
+        /// <param name="semanticModel">语义模型</param>
+        /// <param name="clazz">类定义文件</param>
+        /// <param name="member">方法定义节点或事件字段节点</param>
+        /// <param name="commandAttribute">命令声明特性节点</param>
         CommandBindingInfo CreateCommand(SemanticModel semanticModel, ClassDeclarationSyntax clazz, MemberDeclarationSyntax member, AttributeSyntax commandAttribute)
         {
-             
+            var methodName = string.Empty;
+            var argsType = new List<string>();
+            
             //获取方法命令绑定
             if(member is MethodDeclarationSyntax methodDeclaration)
             {
-                var methodName = methodDeclaration.Identifier.Text;
+                methodName = methodDeclaration.Identifier.Text;
+                if(methodDeclaration.ParameterList != null)
+                {
+                    foreach (var parameter in methodDeclaration.ParameterList.Parameters)
+                    {
+                        var type = semanticModel.GetTypeInfo(parameter.Type);
+                        argsType.Add(type.Type.ToString());
+                    }
+                }
             }
 
-            if(member is EventFieldDeclarationSyntax eventFieldDeclaration)
+            //获取事件命令绑定
+            if (member is EventFieldDeclarationSyntax eventFieldDeclaration)
             {
-                var methodName = Utility.GetEventMethodName(eventFieldDeclaration.Declaration.Variables.ToString());
+                methodName = Utility.GetEventMethodName(eventFieldDeclaration.Declaration.Variables.ToString());
+                var type = eventFieldDeclaration.Declaration.Type;
+                var typeInfo = semanticModel.GetTypeInfo(type);
+                if(typeInfo.Type is INamedTypeSymbol namedTypeSymbol)
+                {
+                    foreach (var arg in namedTypeSymbol.TypeArguments)
+                    {
+                        argsType.Add(arg.ToString());
+                    }
+                }
             }
-            
+
+            if (string.IsNullOrEmpty(methodName))
+            {
+                return null;
+            }
             
             var elementType = string.Empty;
             var elementPath = string.Empty;
@@ -315,6 +389,32 @@ namespace FUICompiler
                     targetPropertyName = expression.Substring(lastDotIndex + 1);
                 }
             }
+
+            var lineSpan = member.GetLocation().GetLineSpan();
+            var location = new LocationInfo
+            {
+                line = lineSpan.Span.End.Line,
+                path = lineSpan.Path,
+            };
+
+            return new CommandBindingInfo
+            {
+                commandInfo = new CommandInfo
+                {
+                    isEvent = member is EventFieldDeclarationSyntax,
+                    name = methodName,
+                    parameters = argsType,
+                    location = location,
+                },
+
+                targetInfo = new CommandTargetInfo
+                {
+                    path = elementPath,
+                    type = elementType,
+                    propertyName = targetPropertyName,
+                    parameters = argsType,
+                }
+            };
         }
     }
 }
