@@ -61,6 +61,11 @@
         /// 行数
         /// </summary>
         public int line;
+
+        /// <summary>
+        /// 列
+        /// </summary>
+        public int column;
     }
 
     /// <summary>

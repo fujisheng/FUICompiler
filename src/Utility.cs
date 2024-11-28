@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Mono.Cecil;
 
 using System.Reflection;
+using System.Security.Cryptography.Pkcs;
 
 using ICustomAttributeProvider = Mono.Cecil.ICustomAttributeProvider;
 
@@ -513,6 +514,18 @@ namespace FUICompiler
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// 获取绑定上下文类型名
+        /// </summary>
+        /// <param name="namespace">命名空间全称</param>
+        /// <param name="bindingInfo">绑定信息</param>
+        /// <param name="contextInfo">上下文信息</param>
+        /// <returns></returns>
+        public static string GetBindingContextTypeName(string @namespace, BindingInfo bindingInfo, ContextBindingInfo contextInfo)
+        {
+            return $"{@namespace}.__{contextInfo.viewModelType.ToCSharpName()}_{bindingInfo.viewName}_Binding_Generated";
         }
     }
 }

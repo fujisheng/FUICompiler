@@ -63,6 +63,11 @@ namespace FUICompiler
         public readonly BindingContextGenerateType contextGenerateType;
 
         /// <summary>
+        /// 绑定配置输出路径
+        /// </summary>
+        public readonly string bindingOutput;
+
+        /// <summary>
         /// 构造编译参数
         /// </summary>
         /// <param name="solutionPath">解决方案路径</param>
@@ -70,7 +75,7 @@ namespace FUICompiler
         /// <param name="output">工程输出路径</param>
         /// <param name="bindingPath">存放绑定资源的路径</param>
         /// <param name="generatedPath">存放生成的代码的路径</param>
-        public BuildParam(string solutionPath, string projectName, string output, string bindingPath, string generatedPath, BindingContextGenerateType contextGenerateType)
+        public BuildParam(string solutionPath, string projectName, string output, string bindingPath, string generatedPath, BindingContextGenerateType contextGenerateType, string bindingOutput)
         {
             this.solutionPath = solutionPath;
             this.projectName = projectName;
@@ -78,6 +83,7 @@ namespace FUICompiler
             this.bindingPath = bindingPath;
             this.generatedPath = generatedPath;
             this.contextGenerateType = contextGenerateType;
+            this.bindingOutput = bindingOutput;
         }
     }
 

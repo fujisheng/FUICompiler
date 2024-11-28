@@ -12,6 +12,13 @@ namespace FUICompiler
     {
         BindingContextGenerator bindingContextGenerator = new BindingContextGenerator(null, null);
 
+        BuildParam buildParam;
+
+        public AttributeBindingContextGenerator(BuildParam param)
+        {
+            buildParam = param;
+        }
+
         public Source?[] Generate(SemanticModel semanticModel, SyntaxNode root, out SyntaxNode newRoot)
         {
             var usings = root.DescendantNodes().OfType<UsingDirectiveSyntax>().ToArray().Select(item=> 
@@ -28,19 +35,19 @@ namespace FUICompiler
                     continue;
                 }
 
-                var bindingConfig = new BindingInfo();
+                var bindingInfo = new BindingInfo();
 
                 //一个可观察对象支持绑定到多个视图
                 if (Utility.TryGetClassBindingAttribute(classDeclaration, out var attributes))
                 {
                     foreach (var attribute in attributes)
                     {
-                        CreateContext(bindingConfig, semanticModel, classDeclaration, attribute);
+                        CreateContext(bindingInfo, semanticModel, classDeclaration, attribute);
                     }
                 }
                 else
                 {
-                    CreateContext(bindingConfig, semanticModel, classDeclaration, null);
+                    CreateContext(bindingInfo, semanticModel, classDeclaration, null);
                 }
 
                 var @namespace = string.Empty;
@@ -48,7 +55,8 @@ namespace FUICompiler
                 {
                     @namespace = namespaceName;
                 }
-                bindingContextGenerator.Generate(bindingConfig, ref sources, usings, @namespace);
+                bindingContextGenerator.Generate(bindingInfo, ref sources, usings, @namespace);
+                TrySaveBindingInfo(bindingInfo, @namespace);
             }
             newRoot = root;
             return sources.ToArray();
@@ -57,11 +65,11 @@ namespace FUICompiler
         /// <summary>
         /// 创建一个绑定上下文配置
         /// </summary>
-        /// <param name="bindingConfig">配置</param>
+        /// <param name="bindingInfo">配置</param>
         /// <param name="semanticModel">语义模型</param>
         /// <param name="classDeclaration">类定义节点</param>
         /// <param name="attribute">特性节点</param>
-        void CreateContext(BindingInfo bindingConfig, SemanticModel semanticModel, ClassDeclarationSyntax classDeclaration, AttributeSyntax attribute)
+        void CreateContext(BindingInfo bindingInfo, SemanticModel semanticModel, ClassDeclarationSyntax classDeclaration, AttributeSyntax attribute)
         {
             var bindingContext = new ContextBindingInfo();
 
@@ -69,7 +77,7 @@ namespace FUICompiler
 
             if(attribute == null)
             {
-                bindingConfig.viewName = string.Empty;
+                bindingInfo.viewName = string.Empty;
             }
             else
             {
@@ -81,7 +89,7 @@ namespace FUICompiler
                     {
                         continue;
                     }
-                    bindingConfig.viewName = arg.Token.ValueText;
+                    bindingInfo.viewName = arg.Token.ValueText;
                 }
             }
 
@@ -126,7 +134,7 @@ namespace FUICompiler
             //如果没有绑定的属性或命令 则不生成绑定上下文
             if(bindingContext.properties.Count > 0 || bindingContext.commands.Count > 0)
             {
-                bindingConfig.contexts.Add(bindingContext);
+                bindingInfo.contexts.Add(bindingContext);
             }
         }
 
@@ -172,10 +180,11 @@ namespace FUICompiler
             var propertyName = property.Identifier.Text;
             var propertyType = property.Type.ToString();
             var isList = Utility.IsObservableList(clazz, property);
-            var lineSpan = property.GetLocation().GetLineSpan();
+            var lineSpan = property.GetLocation().GetMappedLineSpan();
             var location = new LocationInfo
             {
                 line = lineSpan.Span.End.Line,
+                column = lineSpan.Span.End.Character,
                 path = lineSpan.Path,
             };
 
@@ -292,9 +301,9 @@ namespace FUICompiler
 
             return new ConverterInfo
             {
-                type = typeInfo.Type.Name,
-                sourceType = valueType.Name,
-                targetType = targetType.Name
+                type = typeInfo.Type.ToString(),
+                sourceType = valueType.ToString(),
+                targetType = targetType.ToString()
             };
         }
 
@@ -390,10 +399,11 @@ namespace FUICompiler
                 }
             }
 
-            var lineSpan = member.GetLocation().GetLineSpan();
+            var lineSpan = member.GetLocation().GetMappedLineSpan();
             var location = new LocationInfo
             {
                 line = lineSpan.Span.End.Line,
+                column = lineSpan.Span.End.Character,
                 path = lineSpan.Path,
             };
 
@@ -415,6 +425,30 @@ namespace FUICompiler
                     parameters = argsType,
                 }
             };
+        }
+
+        /// <summary>
+        /// 保存绑定配置信息到文件
+        /// </summary>
+        /// <param name="info"></param>
+        void TrySaveBindingInfo(BindingInfo info, string @namespace)
+        {
+            if(string.IsNullOrEmpty(buildParam.bindingOutput))
+            {
+                return;
+            }
+
+            Utility.GetOrCreateDirectory(buildParam.bindingOutput);
+
+            foreach (var item in info.contexts)
+            {
+                var json = Newtonsoft.Json.JsonConvert.SerializeObject(item, Newtonsoft.Json.Formatting.Indented);
+
+                var fileName = Utility.GetBindingContextTypeName(@namespace, info, item);
+                var filePath = Path.Combine(buildParam.bindingOutput, $"{fileName}.binding");
+
+                File.WriteAllText(filePath, json);
+            }
         }
     }
 }
