@@ -391,11 +391,22 @@ namespace FUICompiler
                 //解析nameof  说明是绑定到某个element的某个属性
                 if (args.Expression is InvocationExpressionSyntax invocationArgs && invocationArgs.Expression.ToString() == "nameof")
                 {
-                    var a = invocationArgs.ArgumentList.Arguments[0];
-                    var expression = a.ToString();
-                    var lastDotIndex = expression.IndexOf('.');
-                    elementType = expression.Substring(0, lastDotIndex);
-                    targetPropertyName = expression.Substring(lastDotIndex + 1);
+                    var memberAccess = invocationArgs.ArgumentList.Arguments[0].ChildNodes().OfType<MemberAccessExpressionSyntax>().FirstOrDefault();
+
+                    var sm = semanticModel.GetSymbolInfo(memberAccess.Expression);
+                    if (sm.Symbol is ITypeSymbol typeSymbol)
+                    {
+                        elementType = typeSymbol.ToString();
+                    }
+
+                    //如果这个属性是另一个类型的属性
+                    if (sm.Symbol is IPropertySymbol propertySymbol)
+                    {
+                        //targetPropertyName = propertySymbol.Name;
+                        //targetPropertyType = propertySymbol.Type.ToString();
+                    }
+
+                    targetPropertyName = memberAccess.Name.ToString();
                 }
             }
 
