@@ -37,7 +37,7 @@ jobs:
           release_name="App-$tag-${{ matrix.target }}"
 
           # Build everything
-          dotnet publish src/FUICompiler.slh --framework netcoreapp8.0 --runtime "${{ matrix.target }}" -c Release -o "$release_name"
+          dotnet publish src/FUICompiler.csproj --framework net8.0 --runtime "${{ matrix.target }}" -c Release -o "$release_name"
 
           # Pack files
           if [ "${{ matrix.target }}" == "win-x64" ]; then
