@@ -106,7 +106,7 @@ namespace FUICompiler
             }
 
             var workspace = MSBuildWorkspace.Create();
-            Console.WriteLine($"Loading solution {param.solutionPath}");
+            Console.WriteLine($"Loading solution {param.solutionPath}...");
             var solution = await workspace.OpenSolutionAsync(param.solutionPath);
             var project = solution.Projects.FirstOrDefault(item => item.Name == param.projectName);
 
