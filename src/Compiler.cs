@@ -1,6 +1,5 @@
 ﻿using Microsoft.Build.Locator;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.MSBuild;
 
@@ -102,15 +101,12 @@ namespace FUICompiler
         {
             if (MSBuildLocator.CanRegister)
             {
-                //foreach (var msbuild in MSBuildLocator.QueryVisualStudioInstances())
-                //{
-                //    Console.WriteLine($"VisualStudioInstance: {msbuild.MSBuildPath}");
-                //}
-                MSBuildLocator.RegisterInstance(MSBuildLocator.QueryVisualStudioInstances().First());
+                var instance = MSBuildLocator.QueryVisualStudioInstances().OrderByDescending(item => item.Version).First();
+                MSBuildLocator.RegisterInstance(instance);
             }
 
             var workspace = MSBuildWorkspace.Create();
-            //Console.WriteLine($"Loading solution {param.solutionPath}");
+            Console.WriteLine($"Loading solution {param.solutionPath}");
             var solution = await workspace.OpenSolutionAsync(param.solutionPath);
             var project = solution.Projects.FirstOrDefault(item => item.Name == param.projectName);
 

@@ -1,4 +1,5 @@
 ﻿using FUICompiler;
+using FUICompiler.Message;
 
 const string slnMark = "--sln";
 const string projectMark = "--project";
@@ -8,34 +9,45 @@ const string generatedPathMark = "--generated";
 const string contextGenerateTypeMark = "--ctx_type";
 const string bindingOutputMark = "--binding_output";
 
-
-var compiler = new Compiler();
-//string workspace = "..\\..\\..\\..\\..\\FUI\\";
-//args = $"--sln={workspace}.\\FUI.sln --project=FUI.Test --output={workspace}.\\Library\\ScriptAssemblies --binding={workspace}.\\Binding\\ --generated={workspace}.\\FUI\\Generated\\ --ctx_type=Attribute --binding_output={workspace}.\\FUI\\BindingInfo\\".Split(' ');
-var param = ParseArgs(args);
-
-if (param.contextGenerateType == BindingContextGenerateType.Mix || param.contextGenerateType == BindingContextGenerateType.Attribute)
+try
 {
-    compiler.typeSyntaxRootGenerators.Add(new AttributeBindingContextGenerator(param));
+    var compiler = new Compiler();
+    //string workspace = "..\\..\\..\\..\\..\\FUI\\";
+    //args = $"--sln={workspace}.\\FUI.sln --project=FUI.Test --output={workspace}.\\Library\\ScriptAssemblies --binding={workspace}.\\Binding\\ --generated={workspace}.\\FUI\\Generated\\ --ctx_type=Attribute --binding_output={workspace}.\\FUI\\BindingInfo\\".Split(' ');
+    var param = ParseArgs(args);
+
+    if (param.contextGenerateType == BindingContextGenerateType.Mix || param.contextGenerateType == BindingContextGenerateType.Attribute)
+    {
+        compiler.typeSyntaxRootGenerators.Add(new AttributeBindingContextGenerator(param));
+    }
+
+    if (param.contextGenerateType == BindingContextGenerateType.Mix || param.contextGenerateType == BindingContextGenerateType.Config)
+    {
+        compiler.beforeCompilerSourcesGenerators.Add(new BindingContextGenerator(param.bindingPath, ".binding"));
+    }
+
+    compiler.typeSyntaxRootGenerators.Add(new ObservableObjectAppendGenerator());
+    //compiler.typeDefinationInjectors.Add(new PropertyChangedInjector());
+
+
+    //Console.WriteLine(@$"
+    //start build
+    //sln:{Path.GetFullPath(param.solutionPath)}
+    //project:{param.projectName}
+    //output:{Path.GetFullPath(param.output)}
+    //binding:{Path.GetFullPath(param.bindingPath)}
+    //context_generate_type:{param.contextGenerateType}");
+    await compiler.Build(param);
+}
+catch(Exception e)
+{
+    Message.WriteMessage(MessageType.Log, new LogMessage
+    {
+        Level = LogLevel.Error,
+        Message = e.ToString(),
+    });
 }
 
-if(param.contextGenerateType == BindingContextGenerateType.Mix || param.contextGenerateType == BindingContextGenerateType.Config)
-{
-    compiler.beforeCompilerSourcesGenerators.Add(new BindingContextGenerator(param.bindingPath, ".binding"));
-}
-
-compiler.typeSyntaxRootGenerators.Add(new ObservableObjectAppendGenerator());
-//compiler.typeDefinationInjectors.Add(new PropertyChangedInjector());
-
-
-//Console.WriteLine(@$"
-//start build
-//sln:{Path.GetFullPath(param.solutionPath)}
-//project:{param.projectName}
-//output:{Path.GetFullPath(param.output)}
-//binding:{Path.GetFullPath(param.bindingPath)}
-//context_generate_type:{param.contextGenerateType}");
-await compiler.Build(param);
 
 BuildParam ParseArgs(string[] args)
 {

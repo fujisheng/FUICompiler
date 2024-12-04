@@ -37,7 +37,7 @@ jobs:
           release_name="FUICompiler-$tag-${{ matrix.target }}"
 
           # Build everything
-          dotnet publish src/FUICompiler.csproj --framework net8.0 --runtime "${{ matrix.target }}" -c Release -o "$release_name"
+          dotnet publish src/FUICompiler.csproj --framework net8.0 --runtime "${{ matrix.target }}" -c Release -o "$release_name" --self-contained true  -p:PublishSingleFile=false -p:IncludeNativeLibrariesForSelfExtract=true
 
           # Pack files
           if [ "${{ matrix.target }}" == "win-x64" ]; then
