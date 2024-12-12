@@ -16,10 +16,17 @@ namespace FUICompiler
         /// 通过特性生成
         /// </summary>
         Attribute,
+
         /// <summary>
         /// 通过配置文件生成
         /// </summary>
         Config,
+
+        /// <summary>
+        /// 通过描述文件生成
+        /// </summary>
+        Descriptor,
+
         /// <summary>
         /// 混合生成
         /// </summary>
