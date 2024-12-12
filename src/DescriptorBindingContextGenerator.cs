@@ -39,7 +39,7 @@ namespace FUICompiler
                     var propertyTypeInfo = semanticModel.GetTypeInfo(property);
 
                     var propertyType = propertyTypeInfo.Type;
-                    CreateContext(bindingInfo, property, propertyType as INamedTypeSymbol);
+                    CreateContext(semanticModel, bindingInfo, property, propertyType as INamedTypeSymbol);
                 }
             }
 
@@ -79,7 +79,7 @@ namespace FUICompiler
             return false;
         }
 
-        void CreateContext(BindingInfo bindingInfo, PropertyDeclarationSyntax property, INamedTypeSymbol propertyType)
+        void CreateContext(SemanticModel semanticModel, BindingInfo bindingInfo, PropertyDeclarationSyntax property, INamedTypeSymbol propertyType)
         {
             if(propertyType.IsType(typeof(string)) && property.Identifier.Text == "ViewName")
             {
@@ -88,24 +88,55 @@ namespace FUICompiler
 
             if (propertyType.IsType(typeof(FUI.BindingDescriptor.PropertyBindingDescriptor[])) && property.Identifier.Text == "Propertites")
             {
-                var propertites = property.Identifier.Value as ArrayCreationExpressionSyntax;
-                var methodAccess = propertites.ChildNodes().OfType<MethodAccessException>();
+                var propertites = property.Initializer.Value as ArrayCreationExpressionSyntax;
+                var invocations = propertites.ChildNodes().OfType<InvocationExpressionSyntax>();
+                CreatePropertites(semanticModel, bindingInfo, invocations);
             }
 
             if (propertyType.IsType(typeof(FUI.BindingDescriptor.CommandBindingDescriptor[])) && property.Identifier.Text == "Commands")
             {
-
+                var commands = property.Initializer.Value as ArrayCreationExpressionSyntax;
+                var invocations = commands.ChildNodes().OfType<InvocationExpressionSyntax>();
+                CreatePropertites(semanticModel, bindingInfo, invocations);
             }
         }
 
-        void CreatePropertites(SemanticModel semanticModel, BindingInfo bindingInfo, IEnumerable<MethodAccessException> methodAccess)
+        void CreatePropertites(SemanticModel semanticModel, BindingInfo bindingInfo, IEnumerable<InvocationExpressionSyntax> invocations)
         {
-
+            foreach(var invocation in  invocations)
+            {
+                var argument = invocation.ArgumentList?.Arguments[0];
+                switch (invocation.Expression.ToString())
+                {
+                    case "BindingProperty":
+                        break;
+                    case "ToTarget":
+                        break;
+                    case "ToElement":
+                        break;
+                    case "WithConverter":
+                        break;
+                    case "WithBindingMode":
+                        break;
+                }
+            }
         }
 
-        void CreateCommands()
+        void CreateCommands(SemanticModel semanticModel, BindingInfo bindingInfo, IEnumerable<InvocationExpressionSyntax> invocations)
         {
-
+            foreach(var invocation in invocations)
+            {
+                var argument = invocation.ArgumentList?.Arguments[0];
+                switch(invocation.Expression.ToString())
+                {
+                    case "BindingCommand":
+                        break;
+                    case "ToTarget":
+                        break;
+                    case "ToCommand":
+                        break;
+                }
+            }
         }
     }
 }
