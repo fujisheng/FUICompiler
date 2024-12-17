@@ -39,7 +39,7 @@ namespace FUICompiler
                     var propertyTypeInfo = semanticModel.GetTypeInfo(property);
 
                     var propertyType = propertyTypeInfo.Type;
-                    CreateContext(bindingInfo, property, propertyType as INamedTypeSymbol);
+                    CreateContext(semanticModel, bindingInfo, property, propertyType as INamedTypeSymbol);
                 }
             }
 
@@ -79,7 +79,7 @@ namespace FUICompiler
             return false;
         }
 
-        void CreateContext(BindingInfo bindingInfo, PropertyDeclarationSyntax property, INamedTypeSymbol propertyType)
+        void CreateContext(SemanticModel semanticModel, BindingInfo bindingInfo, PropertyDeclarationSyntax property, INamedTypeSymbol propertyType)
         {
             if(propertyType.IsType(typeof(string)) && property.Identifier.Text == "ViewName")
             {
@@ -88,22 +88,27 @@ namespace FUICompiler
 
             if (propertyType.IsType(typeof(FUI.BindingDescriptor.PropertyBindingDescriptor[])) && property.Identifier.Text == "Propertites")
             {
-                var propertites = property.Identifier.Value as ArrayCreationExpressionSyntax;
-                var methodAccess = propertites.ChildNodes().OfType<MethodAccessException>();
+                var propertites = property.ChildNodes().OfType<ArrowExpressionClauseSyntax>().First()
+                    .ChildNodes().OfType<ArrayCreationExpressionSyntax>().First().Initializer
+                    .ChildNodes().OfType<InvocationExpressionSyntax>();
+                CreatePropertites(semanticModel, bindingInfo, propertites);
             }
 
             if (propertyType.IsType(typeof(FUI.BindingDescriptor.CommandBindingDescriptor[])) && property.Identifier.Text == "Commands")
             {
-
+                var commands = property.ChildNodes().OfType<ArrowExpressionClauseSyntax>().First()
+                    .ChildNodes().OfType<ArrayCreationExpressionSyntax>().First().Initializer
+                    .ChildNodes().OfType<InvocationExpressionSyntax>();
+                CreateCommands(semanticModel, bindingInfo, commands);
             }
         }
 
-        void CreatePropertites(SemanticModel semanticModel, BindingInfo bindingInfo, IEnumerable<MethodAccessException> methodAccess)
+        void CreatePropertites(SemanticModel semanticModel, BindingInfo bindingInfo, IEnumerable<InvocationExpressionSyntax> invocations)
         {
 
         }
 
-        void CreateCommands()
+        void CreateCommands(SemanticModel semanticModel, BindingInfo bindingInfo, IEnumerable<InvocationExpressionSyntax> invocations)
         {
 
         }
