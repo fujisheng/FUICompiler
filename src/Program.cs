@@ -12,13 +12,14 @@ const string bindingOutputMark = "--binding_output";
 try
 {
     var compiler = new Compiler();
-    //string workspace = "..\\..\\..\\..\\..\\FUI\\";
-    //args = $"--sln={workspace}.\\FUI.sln --project=FUI.Test --output={workspace}.\\Library\\ScriptAssemblies --binding={workspace}.\\Binding\\ --generated={workspace}.\\FUI\\Generated\\ --ctx_type=Attribute --binding_output={workspace}.\\FUI\\BindingInfo\\".Split(' ');
+    string workspace = "..\\..\\..\\..\\..\\..\\FUI\\";
+    args = $"--sln={workspace}.\\FUI.sln --project=FUI.Test --output={workspace}.\\Library\\ScriptAssemblies --binding={workspace}.\\Binding\\ --generated={workspace}.\\FUI\\Generated\\ --ctx_type=Attribute --binding_output={workspace}.\\FUI\\BindingInfo\\".Split(' ');
     var param = ParseArgs(args);
 
     if (param.contextGenerateType == BindingContextGenerateType.Mix || param.contextGenerateType == BindingContextGenerateType.Attribute)
     {
         compiler.typeSyntaxRootGenerators.Add(new AttributeBindingContextGenerator(param));
+        compiler.typeSyntaxRootGenerators.Add(new DescriptorBindingContextGenerator(param));
     }
 
     if (param.contextGenerateType == BindingContextGenerateType.Mix || param.contextGenerateType == BindingContextGenerateType.Config)

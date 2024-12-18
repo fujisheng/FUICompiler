@@ -69,6 +69,7 @@ namespace FUICompiler
         /// <returns></returns>
         internal static bool IsType(this ITypeSymbol symbol, Type type)
         {
+            return Matches(symbol, type);
             if (!(symbol is INamedTypeSymbol named))
             {
                 return false;

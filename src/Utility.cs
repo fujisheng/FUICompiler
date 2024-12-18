@@ -527,5 +527,20 @@ namespace FUICompiler
         {
             return $"{@namespace}.__{contextInfo.viewModelType.ToCSharpName()}_{bindingInfo.viewName}_Binding_Generated";
         }
+
+        /// <summary>
+        /// 转换成位置信息
+        /// </summary>
+        /// <param name="location"></param>
+        /// <returns></returns>
+        public static LocationInfo ToLocationInfo(this Location location)
+        {
+            return new LocationInfo
+            {
+                column = location.GetLineSpan().StartLinePosition.Character,
+                line = location.GetLineSpan().StartLinePosition.Line,
+                path = location.SourceTree.FilePath
+            };
+        }
     }
 }

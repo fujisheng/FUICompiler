@@ -4,6 +4,8 @@
 
     public class CommandAttribute : Attribute { }
 
+    public interface IValueConverter { }
+
     public interface IValueConverter<T1, T2> { }
 }
 
