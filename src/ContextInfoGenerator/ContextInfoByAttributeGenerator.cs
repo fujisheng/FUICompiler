@@ -1,65 +1,43 @@
 ﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-
-using System.Reflection;
 
 namespace FUICompiler
 {
     /// <summary>
-    /// 通过特性绑定来生成绑定上下文
+    /// 通过特性生成绑定上下文信息
     /// </summary>
-    internal class AttributeBindingContextGenerator : ITypeSyntaxNodeSourcesGenerator
+    internal class ContextInfoByAttributeGenerator : IContextInfoGenerator
     {
-        BindingContextGenerator bindingContextGenerator = new BindingContextGenerator(null, null);
-
-        BuildParam buildParam;
-
-        public AttributeBindingContextGenerator(BuildParam param)
+        public List<ContextBindingInfo> Generate(SemanticModel semanticModel, SyntaxNode root)
         {
-            buildParam = param;
-        }
-
-        public Source?[] Generate(SemanticModel semanticModel, SyntaxNode root, out SyntaxNode newRoot)
-        {
-            var usings = root.DescendantNodes().OfType<UsingDirectiveSyntax>().ToArray().Select(item=> 
-            {
-                return item?.Name?.ToString();
-            });
-
             var classDeclarations = root.DescendantNodes().OfType<ClassDeclarationSyntax>().ToArray();
-            var sources = new List<Source?>();
+            List<ContextBindingInfo> contexts = new List<ContextBindingInfo>();
+
             foreach (var classDeclaration in classDeclarations)
             {
-                if(!Utility.IsObservableObject(classDeclaration))
+                var type = semanticModel.GetDeclaredSymbol(classDeclaration);
+
+                if (!type.IsObservableObject())
                 {
                     continue;
                 }
-
-                var bindingInfo = new BindingInfo();
 
                 //一个可观察对象支持绑定到多个视图
                 if (Utility.TryGetClassBindingAttribute(classDeclaration, out var attributes))
                 {
                     foreach (var attribute in attributes)
                     {
-                        CreateContext(bindingInfo, semanticModel, classDeclaration, attribute);
+                        contexts.Add(CreateContext(semanticModel, type, classDeclaration, attribute));
                     }
                 }
                 else
                 {
-                    CreateContext(bindingInfo, semanticModel, classDeclaration, null);
+                    contexts.Add(CreateContext(semanticModel, type, classDeclaration, null));
                 }
-
-                var @namespace = string.Empty;
-                if (Utility.TryGetNamespace(classDeclaration, out var namespaceName))
-                {
-                    @namespace = namespaceName;
-                }
-                bindingContextGenerator.Generate(bindingInfo, ref sources, usings, @namespace);
-                TrySaveBindingInfo(bindingInfo, @namespace);
             }
-            newRoot = root;
-            return sources.ToArray();
+
+            return contexts;
         }
 
         /// <summary>
@@ -69,15 +47,15 @@ namespace FUICompiler
         /// <param name="semanticModel">语义模型</param>
         /// <param name="classDeclaration">类定义节点</param>
         /// <param name="attribute">特性节点</param>
-        void CreateContext(BindingInfo bindingInfo, SemanticModel semanticModel, ClassDeclarationSyntax classDeclaration, AttributeSyntax attribute)
+        ContextBindingInfo CreateContext(SemanticModel semanticModel, INamedTypeSymbol type, ClassDeclarationSyntax classDeclaration, AttributeSyntax attribute)
         {
             var bindingContext = new ContextBindingInfo();
 
-            bindingContext.viewModelType = classDeclaration.Identifier.Text;
+            bindingContext.viewModelType = type.ToString();
 
-            if(attribute == null)
+            if (attribute == null)
             {
-                bindingInfo.viewName = string.Empty;
+                bindingContext.viewName = string.Empty;
             }
             else
             {
@@ -89,7 +67,7 @@ namespace FUICompiler
                     {
                         continue;
                     }
-                    bindingInfo.viewName = arg.Token.ValueText;
+                    bindingContext.viewName = arg.Token.ValueText;
                 }
             }
 
@@ -105,7 +83,7 @@ namespace FUICompiler
                 //为每个属性创建绑定
                 foreach (var propertyAttribute in propertyAttributes)
                 {
-                   var propertyBindingInfo = CreatePropertyBindingInfo(semanticModel, classDeclaration, property, propertyAttribute);
+                    var propertyBindingInfo = CreatePropertyBindingInfo(semanticModel, classDeclaration, property, propertyAttribute);
                     if (propertyBindingInfo != null)
                     {
                         bindingContext.properties.Add(propertyBindingInfo);
@@ -114,17 +92,17 @@ namespace FUICompiler
             }
 
             //获取命令绑定
-            foreach(var member in classDeclaration.ChildNodes().OfType<MemberDeclarationSyntax>())
+            foreach (var member in classDeclaration.ChildNodes().OfType<MemberDeclarationSyntax>())
             {
-                if(!Utility.TryGetCommandBindingAttribute(member, out var commandAttributes))
+                if (!Utility.TryGetCommandBindingAttribute(member, out var commandAttributes))
                 {
                     continue;
                 }
 
-                foreach(var commandAttribute  in commandAttributes)
+                foreach (var commandAttribute in commandAttributes)
                 {
                     var commandBindingInfo = CreateCommand(semanticModel, classDeclaration, member, commandAttribute);
-                    if(commandBindingInfo != null)
+                    if (commandBindingInfo != null)
                     {
                         bindingContext.commands.Add(commandBindingInfo);
                     }
@@ -132,10 +110,12 @@ namespace FUICompiler
             }
 
             //如果没有绑定的属性或命令 则不生成绑定上下文
-            if(bindingContext.properties.Count > 0 || bindingContext.commands.Count > 0)
+            if (bindingContext.properties.Count > 0 || bindingContext.commands.Count > 0)
             {
-                bindingInfo.contexts.Add(bindingContext);
+                return bindingContext;
             }
+
+            return null;
         }
 
         /// <summary>
@@ -153,7 +133,7 @@ namespace FUICompiler
             var targetInfo = CreateTargetInfo(semanticModel, clazz, property, propertyAttribute);
             var bindingMode = CreateBindingModeInfo(semanticModel, clazz, property, propertyAttribute);
 
-            if(propertyInfo == null || targetInfo == null)
+            if (propertyInfo == null || targetInfo == null)
             {
                 return null;
             }
@@ -178,22 +158,15 @@ namespace FUICompiler
         PropertyInfo CreatePropertyInfo(SemanticModel semanticModel, ClassDeclarationSyntax clazz, PropertyDeclarationSyntax property, AttributeSyntax attribute)
         {
             var propertyName = property.Identifier.Text;
-            var propertyType = property.Type.ToString();
+            var propertyType = semanticModel.GetTypeInfo(property).Type;
             var isList = Utility.IsObservableList(clazz, property);
-            var lineSpan = property.GetLocation().GetMappedLineSpan();
-            var location = new LocationInfo
-            {
-                line = lineSpan.Span.End.Line,
-                column = lineSpan.Span.End.Character,
-                path = lineSpan.Path,
-            };
 
             return new PropertyInfo
             {
                 name = propertyName,
-                type = propertyType,
+                type = propertyType.ToString(),
                 isList = isList,
-                location = location,
+                location = property.GetLocation().ToLocationInfo(),
             };
         }
 
@@ -209,7 +182,7 @@ namespace FUICompiler
         {
             //解析nameof 说明是绑定到某个element的某个属性
             var targetArgs = attribute.ArgumentList.Arguments
-                .FirstOrDefault((item) => item.Expression is InvocationExpressionSyntax invocation 
+                .FirstOrDefault((item) => item.Expression is InvocationExpressionSyntax invocation
                 && invocation.Expression.ToString() == "nameof");
             var targetInvocationArgs = targetArgs == null ? null : targetArgs.Expression as InvocationExpressionSyntax;
 
@@ -218,7 +191,7 @@ namespace FUICompiler
                 .FirstOrDefault((item) => item.Expression is LiteralExpressionSyntax);
             var targetPathLiteralArgs = targetPathArgs == null ? null : targetPathArgs.Expression as LiteralExpressionSyntax;
 
-            if(targetInvocationArgs == null || targetPathLiteralArgs == null)
+            if (targetInvocationArgs == null || targetPathLiteralArgs == null)
             {
                 return null;
             }
@@ -229,30 +202,30 @@ namespace FUICompiler
             string targetPropertyValueType = string.Empty;
 
             var memberAccess = targetInvocationArgs.ArgumentList.Arguments[0].ChildNodes().OfType<MemberAccessExpressionSyntax>().FirstOrDefault();
-            if(memberAccess == null)
+            if (memberAccess == null)
             {
                 return null;
             }
 
             var sm = semanticModel.GetSymbolInfo(memberAccess.Expression);
-            if(sm.Symbol is ITypeSymbol typeSymbol)
+            if (sm.Symbol is ITypeSymbol typeSymbol)
             {
                 elementType = typeSymbol.ToString();
             }
 
             //如果这个属性是另一个类型的属性
-            if(sm.Symbol is IPropertySymbol propertySymbol)
+            if (sm.Symbol is IPropertySymbol propertySymbol)
             {
                 //targetPropertyName = propertySymbol.Name;
                 //targetPropertyType = propertySymbol.Type.ToString();
             }
-            
+
             var typeInfo = semanticModel.GetTypeInfo(memberAccess);
             targetPropertyName = memberAccess.Name.ToString();
             targetPropertyType = typeInfo.Type.ToString();
-            foreach(var @interface in typeInfo.Type.AllInterfaces)
+            foreach (var @interface in typeInfo.Type.AllInterfaces)
             {
-                if(@interface.IsGenericType && @interface.ToString().StartsWith("FUI.Bindable.IBindableProperty"))
+                if (@interface.IsGenericType && @interface.ToString().StartsWith("FUI.Bindable.IBindableProperty"))
                 {
                     targetPropertyValueType = @interface.TypeArguments[0].ToString();
                 }
@@ -281,7 +254,7 @@ namespace FUICompiler
             //当参数是类型时 说明转换器类型
             var args = attribute.ArgumentList.Arguments.FirstOrDefault((item) => item.Expression is TypeOfExpressionSyntax);
 
-            if(args == null)
+            if (args == null)
             {
                 return null;
             }
@@ -319,7 +292,7 @@ namespace FUICompiler
         {
             //当参数是成员访问表达式时 说明是绑定类型
             var args = attribute.ArgumentList.Arguments.FirstOrDefault((item) => item.Expression is MemberAccessExpressionSyntax);
-            if(args == null)
+            if (args == null)
             {
                 return BindingMode.OneWay;
             }
@@ -339,12 +312,12 @@ namespace FUICompiler
         {
             var methodName = string.Empty;
             var argsType = new List<string>();
-            
+
             //获取方法命令绑定
-            if(member is MethodDeclarationSyntax methodDeclaration)
+            if (member is MethodDeclarationSyntax methodDeclaration)
             {
                 methodName = methodDeclaration.Identifier.Text;
-                if(methodDeclaration.ParameterList != null)
+                if (methodDeclaration.ParameterList != null)
                 {
                     foreach (var parameter in methodDeclaration.ParameterList.Parameters)
                     {
@@ -360,7 +333,7 @@ namespace FUICompiler
                 methodName = Utility.GetEventMethodName(eventFieldDeclaration.Declaration.Variables.ToString());
                 var type = eventFieldDeclaration.Declaration.Type;
                 var typeInfo = semanticModel.GetTypeInfo(type);
-                if(typeInfo.Type is INamedTypeSymbol namedTypeSymbol)
+                if (typeInfo.Type is INamedTypeSymbol namedTypeSymbol)
                 {
                     foreach (var arg in namedTypeSymbol.TypeArguments)
                     {
@@ -373,7 +346,7 @@ namespace FUICompiler
             {
                 return null;
             }
-            
+
             var elementType = string.Empty;
             var elementPath = string.Empty;
             var targetPropertyName = string.Empty;
@@ -410,14 +383,6 @@ namespace FUICompiler
                 }
             }
 
-            var lineSpan = member.GetLocation().GetMappedLineSpan();
-            var location = new LocationInfo
-            {
-                line = lineSpan.Span.End.Line,
-                column = lineSpan.Span.End.Character,
-                path = lineSpan.Path,
-            };
-
             return new CommandBindingInfo
             {
                 commandInfo = new CommandInfo
@@ -425,7 +390,7 @@ namespace FUICompiler
                     isEvent = member is EventFieldDeclarationSyntax,
                     name = methodName,
                     parameters = argsType,
-                    location = location,
+                    location = member.GetLocation().ToLocationInfo(),
                 },
 
                 targetInfo = new CommandTargetInfo
@@ -436,30 +401,6 @@ namespace FUICompiler
                     parameters = argsType,
                 }
             };
-        }
-
-        /// <summary>
-        /// 保存绑定配置信息到文件
-        /// </summary>
-        /// <param name="info"></param>
-        void TrySaveBindingInfo(BindingInfo info, string @namespace)
-        {
-            if(string.IsNullOrEmpty(buildParam.bindingOutput))
-            {
-                return;
-            }
-
-            Utility.GetOrCreateDirectory(buildParam.bindingOutput);
-
-            foreach (var item in info.contexts)
-            {
-                var json = Newtonsoft.Json.JsonConvert.SerializeObject(item, Newtonsoft.Json.Formatting.Indented);
-
-                var fileName = Utility.GetBindingContextTypeName(@namespace, info, item);
-                var filePath = Path.Combine(buildParam.bindingOutput, $"{fileName}.binding");
-
-                File.WriteAllText(filePath, json);
-            }
         }
     }
 }

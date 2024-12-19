@@ -57,7 +57,7 @@ namespace FUICompiler
                 return Matches(named.ConstructedFrom, type.GetGenericTypeDefinition());
             }
 
-            return named.Name == type.Name
+            return named.MetadataName == type.Name
                    && named.ContainingNamespace?.ToDisplayString() == type.Namespace;
         }
 
@@ -106,6 +106,30 @@ namespace FUICompiler
             foreach (var t in type.GetBaseTypesAndThis())
             {
                 if (t.IsType(baseType))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public static bool IsGenericTypeFrom(this ITypeSymbol type, Type baseType)
+        {
+            if (!baseType.IsGenericType)
+            {
+                return false;
+            }
+
+            foreach (var t in type.GetBaseTypesAndThis())
+            {
+                if (t is not INamedTypeSymbol named)
+                {
+                    continue;
+                }
+
+                if (named.IsGenericType 
+                    && named.TypeArguments.Count() == baseType.GetGenericArguments().Length 
+                    && named.ConstructedFrom.Matches(baseType.GetGenericTypeDefinition().BaseType))
                 {
                     return true;
                 }

@@ -11,7 +11,7 @@
         /// <summary>
         /// 构建绑定上下文
         /// </summary>
-        public static string BuildContextCode(ContextBindingInfo contextInfo, BindingInfo bindingInfo, string usings, string @namespace, string converters, string bindings, string unbindings, string functions)
+        public static string BuildContextCode(ContextBindingInfo contextInfo, string usings, string @namespace, string converters, string bindings, string unbindings, string functions)
         {
             return $$"""
 {{Utility.FileHead}}
@@ -19,11 +19,11 @@
 namespace {{@namespace}}
 {
     [FUI.ViewModelAttribute(typeof({{contextInfo.viewModelType}}))]
-    [FUI.ViewAttribute("{{bindingInfo.viewName}}")]
-    public class __{{contextInfo.viewModelType.ToCSharpName()}}_{{bindingInfo.viewName}}_Binding_Generated : FUI.BindingContext
+    [FUI.ViewAttribute("{{contextInfo.viewName}}")]
+    public class __{{contextInfo.viewModelType.ToCSharpName()}}_{{contextInfo.viewName}}_Binding_Generated : FUI.BindingContext
     {
 {{converters}}
-        public __{{contextInfo.viewModelType.ToCSharpName()}}_{{bindingInfo.viewName}}_Binding_Generated(FUI.IView view, FUI.Bindable.ObservableObject viewModel) : base(view, viewModel) { }
+        public __{{contextInfo.viewModelType.ToCSharpName()}}_{{contextInfo.viewName}}_Binding_Generated(FUI.IView view, FUI.Bindable.ObservableObject viewModel) : base(view, viewModel) { }
 
         protected override void Binding()
         {

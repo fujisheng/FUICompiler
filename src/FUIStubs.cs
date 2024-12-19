@@ -24,4 +24,8 @@ namespace FUI.Bindable
 {
     public class ObservableObject { }
     public class BindableProperty<T> { }
+    public interface IBindableProperty<T> { }
+    public interface INotifyPropertyChanged { }
+    public interface INotifyCollectionChanged { }
+    public class CommandTemplate<T> { }
 }

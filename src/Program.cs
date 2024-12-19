@@ -11,34 +11,11 @@ const string bindingOutputMark = "--binding_output";
 
 try
 {
-    var compiler = new Compiler();
     string workspace = "..\\..\\..\\..\\..\\..\\FUI\\";
-    args = $"--sln={workspace}.\\FUI.sln --project=FUI.Test --output={workspace}.\\Library\\ScriptAssemblies --binding={workspace}.\\Binding\\ --generated={workspace}.\\FUI\\Generated\\ --ctx_type=Attribute --binding_output={workspace}.\\FUI\\BindingInfo\\".Split(' ');
+    args = $"--sln={workspace}.\\FUI.sln --project=FUI.Test --output={workspace}.\\Library\\ScriptAssemblies --binding={workspace}.\\Binding\\ --generated={workspace}.\\FUI\\Generated\\ --ctx_type=Mix --binding_output={workspace}.\\FUI\\BindingInfo\\".Split(' ');
     var param = ParseArgs(args);
-
-    if (param.contextGenerateType == BindingContextGenerateType.Mix || param.contextGenerateType == BindingContextGenerateType.Attribute)
-    {
-        compiler.typeSyntaxRootGenerators.Add(new AttributeBindingContextGenerator(param));
-        compiler.typeSyntaxRootGenerators.Add(new DescriptorBindingContextGenerator(param));
-    }
-
-    if (param.contextGenerateType == BindingContextGenerateType.Mix || param.contextGenerateType == BindingContextGenerateType.Config)
-    {
-        compiler.beforeCompilerSourcesGenerators.Add(new BindingContextGenerator(param.bindingPath, ".binding"));
-    }
-
-    compiler.typeSyntaxRootGenerators.Add(new ObservableObjectAppendGenerator());
-    //compiler.typeDefinationInjectors.Add(new PropertyChangedInjector());
-
-
-    //Console.WriteLine(@$"
-    //start build
-    //sln:{Path.GetFullPath(param.solutionPath)}
-    //project:{param.projectName}
-    //output:{Path.GetFullPath(param.output)}
-    //binding:{Path.GetFullPath(param.bindingPath)}
-    //context_generate_type:{param.contextGenerateType}");
-    await compiler.Build(param);
+    var compiler = new Compiler(param);
+    await compiler.Build();
 }
 catch(Exception e)
 {

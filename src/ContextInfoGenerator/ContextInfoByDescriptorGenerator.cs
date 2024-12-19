@@ -1,126 +1,111 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Operations;
-
-using System.Reflection;
 
 namespace FUICompiler
 {
     /// <summary>
-    /// 通过描述文件生成绑定上下文
+    /// 通过描述文件生成上下文信息
     /// </summary>
-    internal class DescriptorBindingContextGenerator : ITypeSyntaxNodeSourcesGenerator
+    internal class ContextInfoByDescriptorGenerator : IContextInfoGenerator
     {
-        BuildParam buildParam;
-
-        public DescriptorBindingContextGenerator(BuildParam buildParam)
+        public List<ContextBindingInfo> Generate(SemanticModel semanticModel, SyntaxNode root)
         {
-            this.buildParam = buildParam;
-        }
-
-        public Source?[] Generate(SemanticModel semanticModel, SyntaxNode root, out SyntaxNode newRoot)
-        {
-            var usings = root.DescendantNodes().OfType<UsingDirectiveSyntax>().ToArray().Select(item =>
-            {
-                return item?.Name?.ToString();
-            });
-
+            var result = new List<ContextBindingInfo>();
             var classDeclarations = root.DescendantNodes().OfType<ClassDeclarationSyntax>().ToArray();
-            var sources = new List<Source?>();
-            foreach(var classDeclaration in classDeclarations)
+            
+            foreach (var classDeclaration in classDeclarations)
             {
-                if(!IsDescriptor(semanticModel, classDeclaration, out var viewModelType))
+                var classType = semanticModel.GetDeclaredSymbol(classDeclaration);
+                if(classType.ToString() == "Test.Descriptor.TestDescriptorContextDescriptor")
+                {
+                    var a = 0;
+                }
+                if(!classType.IsContextDescriptor(out var viewModelType))
                 {
                     continue;
                 }
 
-                var bindingInfo = new BindingInfo();
                 var contextInfo = new ContextBindingInfo
                 {
                     viewModelType = viewModelType.ToString(),
                 };
-                bindingInfo.contexts.Add(contextInfo);
+
                 var properties = classDeclaration.DescendantNodes().OfType<PropertyDeclarationSyntax>();
-                foreach(var property in properties)
+                foreach (var property in properties)
                 {
                     var propertyTypeInfo = semanticModel.GetTypeInfo(property.Type);
-                    CreateContext(semanticModel, bindingInfo, property, propertyTypeInfo.Type);
+                    CreateContext(semanticModel, contextInfo, property, propertyTypeInfo.Type);
                 }
+
+                result.Add(contextInfo);
             }
 
-            newRoot = root;
-            return null;
+            return result;
         }
 
         /// <summary>
-        /// 判断一个类型定义是否是描述文件
+        /// 生成一个上下文信息
         /// </summary>
         /// <param name="semanticModel">语义模型</param>
-        /// <param name="classSyntax">类声明语法树</param>
-        /// <returns></returns>
-        bool IsDescriptor(SemanticModel semanticModel, ClassDeclarationSyntax classSyntax, out INamedTypeSymbol viewModelType)
+        /// <param name="contextInfo">上下文信息</param>
+        /// <param name="property">描述文件中的属性定义</param>
+        /// <param name="propertyType">描述文件中的属性类型</param>
+        void CreateContext(SemanticModel semanticModel, ContextBindingInfo contextInfo, PropertyDeclarationSyntax property, ITypeSymbol propertyType)
         {
-            viewModelType = null;
-            var symbol = semanticModel.GetDeclaredSymbol(classSyntax);
-            if(symbol is not INamedTypeSymbol namedTypeSymbol)
-            {
-                return false;
-            }
-
-            foreach(var baseType in namedTypeSymbol.GetBaseTypesAndThis())
-            {
-                if(baseType is not INamedTypeSymbol baseNamed)
-                {
-                    continue;
-                }
-
-                if(baseNamed.IsGenericType && baseNamed.ToString().StartsWith("FUI.BindingDescriptor.ContextDescriptor"))
-                {
-                    viewModelType = baseNamed.TypeArguments[0] as INamedTypeSymbol;
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        void CreateContext(SemanticModel semanticModel, BindingInfo bindingInfo, PropertyDeclarationSyntax property, ITypeSymbol propertyType)
-        {
-            if(propertyType.IsType(typeof(string)) && property.Identifier.Text == "ViewName")
+            //如果这个属性是ViewName属性 获取ViewName
+            if (propertyType.IsType(typeof(string)) && property.Identifier.Text == "ViewName")
             {
                 var expression = property.ChildNodes().OfType<ArrowExpressionClauseSyntax>().First().Expression;
-                bindingInfo.viewName = (expression as LiteralExpressionSyntax).Token.ValueText;
+                contextInfo.viewName = (expression as LiteralExpressionSyntax).Token.ValueText;
             }
 
-            var isType = propertyType.IsType(typeof(FUI.BindingDescriptor.PropertyBindingDescriptor[]));
+            //如果这个属性是Properties属性 获取属性绑定信息
             if (propertyType.IsType(typeof(FUI.BindingDescriptor.PropertyBindingDescriptor[])) && property.Identifier.Text == "Properties")
             {
                 var propertites = property.ChildNodes().OfType<ArrowExpressionClauseSyntax>().First()
                     .ChildNodes().OfType<ArrayCreationExpressionSyntax>().First().Initializer
                     .ChildNodes().OfType<InvocationExpressionSyntax>();
-                CreatePropertites(semanticModel, bindingInfo, propertites);
+                contextInfo.properties = CreatePropertites(semanticModel, propertites);
             }
 
+            //如果这个属性是Commands属性 获取命令绑定信息
             if (propertyType.IsType(typeof(FUI.BindingDescriptor.CommandBindingDescriptor[])) && property.Identifier.Text == "Commands")
             {
                 var commands = property.ChildNodes().OfType<ArrowExpressionClauseSyntax>().First()
                     .ChildNodes().OfType<ArrayCreationExpressionSyntax>().First().Initializer
                     .ChildNodes().OfType<InvocationExpressionSyntax>();
-                CreateCommands(semanticModel, bindingInfo, commands);
+                contextInfo.commands = CreateCommands(semanticModel, commands);
             }
         }
 
-        void CreatePropertites(SemanticModel semanticModel, BindingInfo bindingInfo, IEnumerable<InvocationExpressionSyntax> invocations)
+        /// <summary>
+        /// 创建所有属性绑定信息
+        /// </summary>
+        /// <param name="semanticModel">语义模型</param>
+        /// <param name="invocations">所有绑定方法调用</param>
+        /// <returns></returns>
+        List<PropertyBindingInfo> CreatePropertites(SemanticModel semanticModel, IEnumerable<InvocationExpressionSyntax> invocations)
         {
-            var propertyBindingInfo = new PropertyBindingInfo();
-            foreach(var invocation in invocations)
+            var result = new List<PropertyBindingInfo>();
+            foreach (var invocation in invocations)
             {
-                propertyBindingInfo.targetInfo = new TargetInfo();
+                var propertyBindingInfo = new PropertyBindingInfo
+                {
+                    targetInfo = new TargetInfo()
+                };
                 CreateProperty(semanticModel, propertyBindingInfo, invocation);
+                result.Add(propertyBindingInfo);
             }
+            return result;
         }
 
+        /// <summary>
+        /// 创建一个属性绑定信息
+        /// </summary>
+        /// <param name="semanticModel">语义模型</param>
+        /// <param name="propertyBinding">属性绑定信息</param>
+        /// <param name="invocation">绑定方法调用</param>
         void CreateProperty(SemanticModel semanticModel, PropertyBindingInfo propertyBinding, InvocationExpressionSyntax invocation)
         {
             var memberAccesses = invocation.ChildNodes().OfType<MemberAccessExpressionSyntax>();
@@ -160,6 +145,12 @@ namespace FUICompiler
             }
         }
 
+        /// <summary>
+        /// 创建属性源信息
+        /// </summary>
+        /// <param name="semanticModel">语义模型</param>
+        /// <param name="invocation">BindingProperty调用</param>
+        /// <returns></returns>
         PropertyInfo CreatePropertyInfo(SemanticModel semanticModel, InvocationExpressionSyntax invocation)
         {
             var memberAccess = invocation.ArgumentList.Arguments.First().Expression as MemberAccessExpressionSyntax;
@@ -169,44 +160,51 @@ namespace FUICompiler
             propertyInfo.type = propertyTypeInfo.Type.ToString();
             var propertySymbolInfo = semanticModel.GetSymbolInfo(memberAccess.Name);
             propertyInfo.location = propertySymbolInfo.Symbol.Locations.First().ToLocationInfo();
-
-            foreach (var @interface in propertyTypeInfo.Type.AllInterfaces)
-            {
-                if (@interface.IsGenericType && @interface.ToString().StartsWith("FUI.Bindable.IReadOnlyObservableList"))
-                {
-                    propertyInfo.isList = true;
-                }
-            }
+            propertyInfo.isList = propertyTypeInfo.Type.IsObservableList();
 
             return propertyInfo;
         }
 
+        /// <summary>
+        /// 创建目标路径信息
+        /// </summary>
+        /// <param name="semanticModel">语义模型</param>
+        /// <param name="targetInfo">目标信息</param>
+        /// <param name="invocation">ToTarget调用</param>
         void CreateTargetInfo(SemanticModel semanticModel, TargetInfo targetInfo, InvocationExpressionSyntax invocation)
         {
             var targetPath = (invocation.ArgumentList.Arguments.First().Expression as LiteralExpressionSyntax).Token.ValueText;
             targetInfo.path = targetPath;
         }
 
+        /// <summary>
+        /// 创建目标元素信息
+        /// </summary>
+        /// <param name="semanticModel">语义模型</param>
+        /// <param name="targetInfo">目标信息</param>
+        /// <param name="invocation">ToElement调用</param>
         void CreateElementInfo(SemanticModel semanticModel, TargetInfo targetInfo, InvocationExpressionSyntax invocation)
         {
             var nameofArg = invocation.ArgumentList.Arguments.First().Expression as InvocationExpressionSyntax;
             var memberAccessExpr = nameofArg.ArgumentList.Arguments.First().Expression as MemberAccessExpressionSyntax;
-            
+
             targetInfo.type = semanticModel.GetTypeInfo(memberAccessExpr.Expression).Type.ToString();
             var propertyTypeInfo = semanticModel.GetTypeInfo(memberAccessExpr);
             targetInfo.propertyType = semanticModel.GetTypeInfo(memberAccessExpr).Type.ToString();
             targetInfo.propertyName = memberAccessExpr.Name.ToString();
 
-            foreach (var @interface in propertyTypeInfo.Type.AllInterfaces)
+            if(propertyTypeInfo.Type.IsBindableProperty(out var propertyValueType))
             {
-                if (@interface.IsGenericType && @interface.ToString().StartsWith("FUI.Bindable.IBindableProperty"))
-                {
-                    targetInfo.propertyValueType = @interface.TypeArguments[0].ToString();
-                    break;
-                }
+                targetInfo.propertyValueType = propertyValueType.ToString();
             }
         }
 
+        /// <summary>
+        /// 创建转换器信息
+        /// </summary>
+        /// <param name="semanticModel">语义模型</param>
+        /// <param name="memberAccess">.ToConverter调用</param>
+        /// <returns></returns>
         ConverterInfo CreateConverterInfo(SemanticModel semanticModel, MemberAccessExpressionSyntax memberAccess)
         {
             var genericName = memberAccess.ChildNodes().OfType<GenericNameSyntax>().First();
@@ -221,6 +219,12 @@ namespace FUICompiler
             return converterInfo;
         }
 
+        /// <summary>
+        /// 创建绑定模式
+        /// </summary>
+        /// <param name="semanticModel">语义模型</param>
+        /// <param name="invocation">WithBindingMode调用</param>
+        /// <returns></returns>
         BindingMode CreateBindingMode(SemanticModel semanticModel, InvocationExpressionSyntax invocation)
         {
             var argument = invocation.ArgumentList.Arguments.First();
@@ -228,22 +232,55 @@ namespace FUICompiler
             return Enum.Parse<BindingMode>(memberAccess.Name.Identifier.Text);
         }
 
-        void CreateCommands(SemanticModel semanticModel, BindingInfo bindingInfo, IEnumerable<InvocationExpressionSyntax> invocations)
+        /// <summary>
+        /// 创建所有命令绑定信息
+        /// </summary>
+        /// <param name="semanticModel">语义模型</param>
+        /// <param name="invocations">所有BingingCommand调用</param>
+        /// <returns></returns>
+        List<CommandBindingInfo> CreateCommands(SemanticModel semanticModel, IEnumerable<InvocationExpressionSyntax> invocations)
         {
-            var commandBindingInfo = new CommandBindingInfo();
+            var result = new List<CommandBindingInfo>();
             foreach (var invocation in invocations)
             {
-                commandBindingInfo.targetInfo = new CommandTargetInfo();
-                commandBindingInfo.commandInfo = new CommandInfo();
+                var commandBindingInfo = new CommandBindingInfo
+                {
+                    targetInfo = new CommandTargetInfo(),
+                    commandInfo = new CommandInfo()
+                };
                 CreateCommand(semanticModel, commandBindingInfo, invocation);
+                result.Add(commandBindingInfo);
             }
+            return result;
         }
 
+        /// <summary>
+        /// 创建一个命令绑定信息
+        /// </summary>
+        /// <param name="semanticModel">语义模型</param>
+        /// <param name="bindingInfo">命令绑定信息</param>
+        /// <param name="invocation">BindingCommand调用</param>
         void CreateCommand(SemanticModel semanticModel, CommandBindingInfo bindingInfo, InvocationExpressionSyntax invocation)
         {
             var memberAccesses = invocation.ChildNodes().OfType<MemberAccessExpressionSyntax>();
             var hasMemberAccess = memberAccesses != null && memberAccesses.Count() != 0;
-            var accessName = hasMemberAccess ? memberAccesses.First().Name.Identifier.Text : invocation.Expression.ToString();
+            var accessName = string.Empty;
+            if (hasMemberAccess)
+            {
+                accessName = memberAccesses.First().Name.Identifier.Text;
+            }
+            else
+            {
+                if(invocation.Expression is GenericNameSyntax generic)
+                {
+                    accessName = generic.Identifier.ValueText;
+                }
+                else
+                {
+                    accessName = invocation.Expression.ToString();
+                }
+            }
+
             switch (accessName)
             {
                 case "BindingCommand":
@@ -269,18 +306,26 @@ namespace FUICompiler
             }
         }
 
+        /// <summary>
+        /// 创建命令源信息
+        /// </summary>
+        /// <param name="semanticModel">语义模型</param>
+        /// <param name="commandInfo">命令绑定信息</param>
+        /// <param name="invocation">BindingCommand调用</param>
         void CreateCommandInfo(SemanticModel semanticModel, CommandInfo commandInfo, InvocationExpressionSyntax invocation)
         {
             var argument = invocation.ArgumentList.Arguments.First().Expression;
-            var memberAccess = argument is MemberAccessExpressionSyntax 
-                ? argument as MemberAccessExpressionSyntax 
+            var memberAccess = argument is MemberAccessExpressionSyntax
+                ? argument as MemberAccessExpressionSyntax
                 : (argument as InvocationExpressionSyntax).ArgumentList.Arguments.First().Expression as MemberAccessExpressionSyntax;
 
             var typeInfo = semanticModel.GetSymbolInfo(memberAccess.Name);
-            commandInfo.name = memberAccess.Name.Identifier.ValueText;
             commandInfo.parameters = new List<string>();
+
+            //如果命令源是一个方法
             if (typeInfo.Symbol is IMethodSymbol methodSymbol)
             {
+                commandInfo.name = memberAccess.Name.Identifier.ValueText;
                 commandInfo.location = methodSymbol.Locations.First().ToLocationInfo();
                 foreach (var param in methodSymbol.Parameters)
                 {
@@ -288,11 +333,14 @@ namespace FUICompiler
                 }
             }
 
+            //如果命令源是一个事件
             if (typeInfo.Symbol is IEventSymbol eventSymbol)
             {
+                //命令源是一个事件的时候 会生成一个事件调用方法 这儿存这个方法的名字
+                commandInfo.name = Utility.GetEventMethodName(memberAccess.Name.Identifier.ValueText);
                 commandInfo.isEvent = true;
                 commandInfo.location = eventSymbol.Locations.First().ToLocationInfo();
-                if(eventSymbol.Type is INamedTypeSymbol namedTypeSymbol)
+                if (eventSymbol.Type is INamedTypeSymbol namedTypeSymbol)
                 {
                     foreach (var param in namedTypeSymbol.TypeArguments)
                     {
@@ -302,12 +350,24 @@ namespace FUICompiler
             }
         }
 
+        /// <summary>
+        /// 创建命令目标路径信息
+        /// </summary>
+        /// <param name="semanticModel">语义模型</param>
+        /// <param name="targetInfo">目标信息</param>
+        /// <param name="invocation">ToTarget调用</param>
         void CreateCommandTargetPathInfo(SemanticModel semanticModel, CommandTargetInfo targetInfo, InvocationExpressionSyntax invocation)
         {
             var targetPath = (invocation.ArgumentList.Arguments.First().Expression as LiteralExpressionSyntax).Token.ValueText;
             targetInfo.path = targetPath;
         }
 
+        /// <summary>
+        /// 创建命令目标信息
+        /// </summary>
+        /// <param name="semanticModel">语义模型</param>
+        /// <param name="targetInfo">目标信息</param>
+        /// <param name="invocation">ToCommand调用</param>
         void CreateCommandTargetInfo(SemanticModel semanticModel, CommandTargetInfo targetInfo, InvocationExpressionSyntax invocation)
         {
             var nameofArg = invocation.ArgumentList.Arguments.First().Expression as InvocationExpressionSyntax;
@@ -316,16 +376,13 @@ namespace FUICompiler
             targetInfo.type = semanticModel.GetTypeInfo(memberAccessExpr.Expression).Type.ToString();
             var propertyTypeInfo = semanticModel.GetTypeInfo(memberAccessExpr);
             targetInfo.propertyName = memberAccessExpr.Name.ToString();
-
             targetInfo.parameters = new List<string>();
-            foreach (var @interface in propertyTypeInfo.Type.AllInterfaces)
+
+            if(propertyTypeInfo.Type.IsCommand(out var arguments))
             {
-                if (@interface.IsGenericType && @interface.ToString().StartsWith("FUI.Bindable.ICommand"))
+                foreach(var arg in arguments)
                 {
-                    foreach (var type in @interface.TypeArguments)
-                    {
-                        targetInfo.parameters.Add(type.ToString());
-                    }
+                    targetInfo.parameters.Add(arg.ToString());
                 }
             }
         }

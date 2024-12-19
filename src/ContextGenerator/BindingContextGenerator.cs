@@ -1,37 +1,20 @@
-﻿using Newtonsoft.Json;
-
-using System.Text;
+﻿using System.Text;
 
 namespace FUICompiler
 {
-    public partial class BindingContextGenerator : IBeforeCompilerSourcesGenerator
+    /// <summary>
+    /// 绑定上下文生成器
+    /// </summary>
+    public partial class BindingContextGenerator
     {
-        string configPath;
-        string configExtension;
-
-        public BindingContextGenerator(string configPath, string configExtension)
+        internal IReadOnlyList<Source> Generate(IReadOnlyList<ContextBindingInfo> contexts)
         {
-            this.configPath = configPath;
-            this.configExtension = configExtension;
-        }
-
-        Source?[] IBeforeCompilerSourcesGenerator.Generate()
-        {
-            var result = new List<Source?>();
-            foreach (var file in Directory.GetFiles(configPath, $"*{configExtension}"))
+            var result = new List<Source>();
+            foreach (var bindingContext in contexts)
             {
-                var config = JsonConvert.DeserializeObject<BindingInfo>(File.ReadAllText(file));
+                var usings = new List<string>(0);
+                var @namespace = string.Empty;
 
-                Generate(config, ref result);
-            }
-
-            return result.ToArray();
-        }
-
-        internal void Generate(BindingInfo config, ref List<Source?> result, IEnumerable<string> usings = null, string @namespace = null)
-        {
-            foreach (var bindingContext in config.contexts)
-            {
                 var bindingBuilder = new StringBuilder();
                 var unbindingBuilder = new StringBuilder();
                 HashSet<string> converterTypes = new HashSet<string>();
@@ -54,7 +37,7 @@ namespace FUICompiler
                     }
 
                     //如果是双向绑定需要构建从View到ViewModel的绑定
-                    if(property.bindingMode.HasFlag(BindingMode.OneWayToSource))
+                    if (property.bindingMode.HasFlag(BindingMode.OneWayToSource))
                     {
                         BuildV2VMBinding(bindingContext, property, ref bindingItemsBuilder, ref unbindingItemsBuilder, ref functionBuilder);
                     }
@@ -67,9 +50,9 @@ namespace FUICompiler
                 }
 
                 //为命令生成绑定和解绑代码
-                foreach(var command in bindingContext.commands)
+                foreach (var command in bindingContext.commands)
                 {
-                    BuildCommandBinding(bindingContext, command, ref bindingItemsBuilder, ref unbindingItemsBuilder, ref  functionBuilder);
+                    BuildCommandBinding(bindingContext, command, ref bindingItemsBuilder, ref unbindingItemsBuilder, ref functionBuilder);
                 }
 
                 //组装绑定代码
@@ -90,19 +73,21 @@ namespace FUICompiler
                 var @namespaceName = string.IsNullOrEmpty(@namespace) ? DefaultNamespace : @namespace;
 
                 //组装所有的绑定代码
-                var code = BuildContextCode(bindingContext, config, usingBuilder.ToString(), @namespaceName, convertersBuilder.ToString(), bindingBuilder.ToString(), unbindingBuilder.ToString(), functionBuilder.ToString());
+                var code = BuildContextCode(bindingContext, usingBuilder.ToString(), @namespaceName, convertersBuilder.ToString(), bindingBuilder.ToString(), unbindingBuilder.ToString(), functionBuilder.ToString());
 
                 //格式化代码
                 code = Utility.NormalizeCode(code);
 
-                result.Add(new Source($"{bindingContext.viewModelType.ToCSharpName()}_{config.viewName}.DataBinding.g", code));
+                result.Add(new Source($"{bindingContext.viewModelType.ToCSharpName()}_{bindingContext.viewName}.DataBinding.g", code));
             }
+
+            return result;
         }
 
         //构建普通属性绑定
         void BuildNormalPropertyBinding(ContextBindingInfo bindingContext, PropertyBindingInfo property,
-            ref StringBuilder functionBuilder, 
-            ref StringBuilder bindingItemsBuilder, 
+            ref StringBuilder functionBuilder,
+            ref StringBuilder bindingItemsBuilder,
             ref StringBuilder unbindingItemsBuilder)
         {
             var delegateName = Utility.GetPropertyChangedDelegateName(property.propertyInfo.name);
