@@ -23,7 +23,7 @@
         /// <summary>
         /// 混合生成
         /// </summary>
-        Mix = Attribute | Config | Descriptor,
+        All = Attribute | Config | Descriptor,
     }
 
     /// <summary>

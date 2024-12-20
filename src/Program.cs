@@ -12,7 +12,7 @@ const string bindingOutputMark = "--binding_output";
 try
 {
     //string workspace = "..\\..\\..\\..\\..\\..\\FUI\\";
-    //args = $"--sln={workspace}.\\FUI.sln --project=FUI.Test --output={workspace}.\\Library\\ScriptAssemblies --binding={workspace}.\\Binding\\ --generated={workspace}.\\FUI\\Generated\\ --ctx_type=Mix --binding_output={workspace}.\\FUI\\BindingInfo\\".Split(' ');
+    //args = $"--sln={workspace}.\\FUI.sln --project=FUI.Test --output={workspace}.\\Library\\ScriptAssemblies --binding={workspace}.\\Binding\\ --generated={workspace}.\\FUI\\Generated\\  --binding_output={workspace}.\\FUI\\BindingInfo\\".Split(' ');
     var param = ParseArgs(args);
     var compiler = new Compiler(param);
     await compiler.Build();
@@ -49,7 +49,7 @@ BuildParam ParseArgs(string[] args)
         output: args[outputIndex].Substring(outputMark.Length + 1),
         bindingPath: bindingPathIndex == -1 ? string.Empty : args[bindingPathIndex].Substring(bindingConfigMark.Length + 1),
         generatedPath: generatedPathIndex == -1 ? string.Empty : args[generatedPathIndex].Substring(generatedPathMark.Length + 1),
-        contextGenerateType: contextGenerateTypeIndex == -1 ? BindingContextGenerateType.Mix : Enum.Parse<BindingContextGenerateType>(args[contextGenerateTypeIndex].Substring(contextGenerateTypeMark.Length + 1)),
+        contextGenerateType: contextGenerateTypeIndex == -1 ? BindingContextGenerateType.All : (BindingContextGenerateType)int.Parse(args[contextGenerateTypeIndex].Substring(contextGenerateTypeMark.Length + 1)),
         bindingOutput: bindingOutputIndex == -1 ? string.Empty : args[bindingOutputIndex].Substring(bindingOutputMark.Length + 1)
     );
 }
