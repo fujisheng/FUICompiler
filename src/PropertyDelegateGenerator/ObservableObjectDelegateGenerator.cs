@@ -22,16 +22,16 @@ namespace FUICompiler
             var sources = new List<Source>();
             foreach(var classDeclaration in classDeclarations)
             {
-                var type = semanticModel.GetDeclaredSymbol(classDeclaration);
+                var classType = semanticModel.GetDeclaredSymbol(classDeclaration);
 
                 //如果不是可观察对象直接不管
-                if (!type.IsObservableObject())
+                if (!classType.IsObservableObject())
                 {
                     continue;
                 }
 
                 //如果是静态类或者抽象类直接不管
-                if (type.IsAbstract || type.IsStatic)
+                if (classType.IsAbstract || classType.IsStatic)
                 {
                     continue;
                 }
@@ -51,7 +51,7 @@ namespace FUICompiler
                 }
 
                 //判断是否有命名空间
-                var @namespace = type.ContainingNamespace.ToDisplayString();
+                var @namespace = classType.ContainingNamespace.ToDisplayString();
                 var hasNamespace = !string.IsNullOrEmpty(@namespace);
                 if (hasNamespace)
                 {
@@ -60,7 +60,7 @@ namespace FUICompiler
                 }
 
                 //生成分布类
-                appendBuilder.AppendLine($"public partial class {type.Name} : {Utility.SynchronizePropertiesFullName}");
+                appendBuilder.AppendLine($"public partial class {classType.Name} : {typeof(FUI.ISynchronizeProperties).FullName}");
                 appendBuilder.AppendLine("{");
 
                 var syncPropertiesBuilder = new StringBuilder();
@@ -68,13 +68,10 @@ namespace FUICompiler
                 //遍历所有属性 生成对应委托
                 foreach (var property in classDeclaration.ChildNodes().OfType<PropertyDeclarationSyntax>())
                 {
-                    //if (!Utility.IsObservableProperty(classDeclaration, property))
-                    //{
-                    //    continue;
-                    //}
+                    var propertyTypeInfo = semanticModel.GetDeclaredSymbol(property);
 
-                    var propertyType = property.Type.ToString();
-                    var propertyName = property.Identifier.Text;
+                    var propertyType = propertyTypeInfo.Type.ToString();
+                    var propertyName = propertyTypeInfo.Name;
 
                     //生成BackingField
                     var fieldName = Utility.GetPropertyBackingFieldName(propertyName);
@@ -94,7 +91,7 @@ namespace FUICompiler
                 var events = classDeclaration.DescendantNodes().OfType<EventFieldDeclarationSyntax>().ToArray();
                 foreach (var @event in events)
                 {
-                    var eventCaller = GenerateEventCaller(@event);
+                    var eventCaller = GenerateEventCaller(semanticModel, @event);
                     appendBuilder.AppendLine(eventCaller);
                 }
 
@@ -107,7 +104,7 @@ namespace FUICompiler
                     appendBuilder.AppendLine("}");
                 }
                 var code = Utility.NormalizeCode(appendBuilder.ToString());
-                sources.Add(new Source($"{classDeclaration.Identifier.Text}.PropertyChanged.g", code));
+                sources.Add(new Source($"{classType.ToString()}.PropertyChanged.g", code));
             }
 
             return sources;
@@ -121,7 +118,7 @@ namespace FUICompiler
         void GenerateSyncPropertites(StringBuilder propertyDelegateBuilder, StringBuilder syncPropertiesBuilder)
         {
             //生成同步所有属性的方法
-            propertyDelegateBuilder.AppendLine($"void {Utility.SynchronizePropertiesFullName}.{Utility.SynchronizePropertiesMethodName}()");
+            propertyDelegateBuilder.AppendLine($"void {typeof(FUI.ISynchronizeProperties).FullName}.{nameof(FUI.ISynchronizeProperties.Synchronize)}()");
             propertyDelegateBuilder.AppendLine("{");
             propertyDelegateBuilder.AppendLine(syncPropertiesBuilder.ToString());
             propertyDelegateBuilder.AppendLine("}");
@@ -132,14 +129,28 @@ namespace FUICompiler
         /// </summary>
         /// <param name="syntax">事件字段</param>
         /// <returns></returns>
-        string GenerateEventCaller(EventFieldDeclarationSyntax syntax)
+        string GenerateEventCaller(SemanticModel semanticModel, EventFieldDeclarationSyntax syntax)
         {
-            var argsType = (syntax.Declaration.Type as GenericNameSyntax).TypeArgumentList.Arguments;
+            var eventTypeInfo = semanticModel.GetTypeInfo(syntax.Declaration.Type);
+            var namedEventType = eventTypeInfo.Type as INamedTypeSymbol;
+            var argsTypesString = string.Empty;
+            var invokeParams = string.Empty;
+            if (namedEventType.IsGenericType)
+            {
+                var argsTypes = namedEventType.TypeArguments;
+                for(int i = 0; i< argsTypes.Length; i++)
+                {
+                    var end = i == argsTypes.Length - 1 ? string.Empty : ",";
+                    argsTypesString += $"{argsTypes[i]} arg{i}{end}";
+                    invokeParams += $"arg{i}{end}";
+                }
+            }
+
             var callerName = Utility.GetEventMethodName(syntax.Declaration.Variables.ToString());
             return $$"""
-public void {{callerName}} ({{argsType}} args)
+public void {{callerName}} ({{argsTypesString}})
 {
-    this.{{syntax.Declaration.Variables}}?.Invoke(args);
+    this.{{syntax.Declaration.Variables}}?.Invoke({{invokeParams}});
 }
 """;
         }

@@ -6,24 +6,21 @@
     public partial class BindingContextGenerator
     {
         #region 类模板
-        const string DefaultNamespace = "__DataBindingGenerated";
-
         /// <summary>
         /// 构建绑定上下文
         /// </summary>
-        public static string BuildContextCode(ContextBindingInfo contextInfo, string usings, string @namespace, string converters, string bindings, string unbindings, string functions)
+        public static string BuildContextCode(ContextBindingInfo contextInfo, string converters, string bindings, string unbindings, string functions)
         {
             return $$"""
 {{Utility.FileHead}}
-{{usings}}
-namespace {{@namespace}}
+namespace {{Utility.BindingContextDefaultNamespace}}
 {
     [FUI.ViewModelAttribute(typeof({{contextInfo.viewModelType}}))]
     [FUI.ViewAttribute("{{contextInfo.viewName}}")]
-    public class __{{contextInfo.viewModelType.ToCSharpName()}}_{{contextInfo.viewName}}_Binding_Generated : FUI.BindingContext
+    public class {{contextInfo.viewModelType.ToCSharpName()}}_{{contextInfo.viewName}}_Binding_Generated : FUI.BindingContext
     {
 {{converters}}
-        public __{{contextInfo.viewModelType.ToCSharpName()}}_{{contextInfo.viewName}}_Binding_Generated(FUI.IView view, FUI.Bindable.ObservableObject viewModel) : base(view, viewModel) { }
+        public {{contextInfo.viewModelType.ToCSharpName()}}_{{contextInfo.viewName}}_Binding_Generated(FUI.IView view, FUI.Bindable.ObservableObject viewModel) : base(view, viewModel) { }
 
         protected override void Binding()
         {

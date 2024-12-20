@@ -158,14 +158,13 @@ namespace FUICompiler
         PropertyInfo CreatePropertyInfo(SemanticModel semanticModel, ClassDeclarationSyntax clazz, PropertyDeclarationSyntax property, AttributeSyntax attribute)
         {
             var propertyName = property.Identifier.Text;
-            var propertyType = semanticModel.GetTypeInfo(property).Type;
-            var isList = Utility.IsObservableList(clazz, property);
+            var propertyType = semanticModel.GetTypeInfo(property.Type).Type;
 
             return new PropertyInfo
             {
                 name = propertyName,
                 type = propertyType.ToString(),
-                isList = isList,
+                isList = propertyType.IsObservableList(),
                 location = property.GetLocation().ToLocationInfo(),
             };
         }

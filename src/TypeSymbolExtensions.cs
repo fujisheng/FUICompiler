@@ -6,23 +6,55 @@ namespace FUICompiler
 {
     internal static class TypeSymbolExtensions
     {
-        public static bool Extends(this ITypeSymbol symbol, Type type)
+        static Queue<ITypeSymbol> cache = new Queue<ITypeSymbol>();
+
+        /// <summary>
+        /// 判断一个类型是否继承自某个类型或者实现了某个接口
+        /// </summary>
+        /// <param name="symbol">源类型</param>
+        /// <param name="type">目标类型</param>
+        /// <returns></returns>
+        internal static bool Extends(this ITypeSymbol symbol, Type type)
         {
             if (symbol == null || type == null)
-                return false;
-
-            while (symbol != null)
             {
-                if (symbol.Matches(type))
-                    return true;
+                return false;
+            }
 
-                symbol = symbol.BaseType;
+            var openList = cache;
+            openList.Clear();
+            openList.Enqueue(symbol);
+
+            while(openList.Count > 0)
+            {
+                var current = openList.Dequeue();
+
+                if (current.Matches(type))
+                {
+                    return true;
+                }
+
+                if (current.BaseType != null)
+                {
+                    openList.Enqueue(current.BaseType);
+                }
+
+                foreach (var @interface in current.Interfaces)
+                {
+                    openList.Enqueue(@interface);
+                }
             }
 
             return false;
         }
 
-        public static bool Matches(this ITypeSymbol symbol, Type type)
+        /// <summary>
+        /// 判断一个类型是否和另一个类型匹配 
+        /// </summary>
+        /// <param name="symbol">源类型</param>
+        /// <param name="type">目标类型</param>
+        /// <returns></returns>
+        internal static bool Matches(this ITypeSymbol symbol, Type type)
         {
             switch (symbol.SpecialType)
             {
@@ -42,23 +74,30 @@ namespace FUICompiler
             }
 
             if (!(symbol is INamedTypeSymbol named))
+            {
                 return false;
+            }
 
             if (type.IsConstructedGenericType)
             {
                 var args = type.GetTypeInfo().GenericTypeArguments;
                 if (args.Length != named.TypeArguments.Length)
+                {
                     return false;
+                }
 
                 for (var i = 0; i < args.Length; i++)
+                {
                     if (!Matches(named.TypeArguments[i], args[i]))
+                    {
                         return false;
-
+                    }
+                }
+                    
                 return Matches(named.ConstructedFrom, type.GetGenericTypeDefinition());
             }
 
-            return named.MetadataName == type.Name
-                   && named.ContainingNamespace?.ToDisplayString() == type.Namespace;
+            return named.MetadataName == type.Name && named.ContainingNamespace?.ToDisplayString() == type.Namespace;
         }
 
         /// <summary>
@@ -70,15 +109,9 @@ namespace FUICompiler
         internal static bool IsType(this ITypeSymbol symbol, Type type)
         {
             return Matches(symbol, type);
-            if (!(symbol is INamedTypeSymbol named))
-            {
-                return false;
-            }
-
-            return named.Name == type.Name && named.ContainingNamespace?.ToDisplayString() == type.Namespace;
         }
 
-        public static IEnumerable<ITypeSymbol> GetBaseTypesAndThis(this ITypeSymbol type)
+        internal static IEnumerable<ITypeSymbol> GetBaseTypesAndThis(this ITypeSymbol type)
         {
             var current = type;
             while (current != null)
@@ -88,7 +121,7 @@ namespace FUICompiler
             }
         }
 
-        public static bool InheritsFromOrEquals(this ITypeSymbol type, ITypeSymbol baseType)
+        internal static bool InheritsFromOrEquals(this ITypeSymbol type, ITypeSymbol baseType)
         {
             foreach (var t in type.GetBaseTypesAndThis())
             {
@@ -101,7 +134,7 @@ namespace FUICompiler
             return false;
         }
 
-        public static bool InheritsFrom(this ITypeSymbol type, Type baseType)
+        internal static bool InheritsFrom(this ITypeSymbol type, Type baseType)
         {
             foreach (var t in type.GetBaseTypesAndThis())
             {

@@ -7,6 +7,11 @@
     public interface IValueConverter { }
 
     public interface IValueConverter<T1, T2> { }
+
+    public interface ISynchronizeProperties
+    {
+        void Synchronize();
+    }
 }
 
 namespace FUI.BindingDescriptor

@@ -12,9 +12,6 @@ namespace FUICompiler
             var result = new List<Source>();
             foreach (var bindingContext in contexts)
             {
-                var usings = new List<string>(0);
-                var @namespace = string.Empty;
-
                 var bindingBuilder = new StringBuilder();
                 var unbindingBuilder = new StringBuilder();
                 HashSet<string> converterTypes = new HashSet<string>();
@@ -65,15 +62,8 @@ namespace FUICompiler
                 var convertersBuilder = new StringBuilder();
                 BuildConverterCostructor(converterTypes, ref convertersBuilder);
 
-                //添加using
-                var usingBuilder = new StringBuilder();
-                BuildUsings(usings, ref usingBuilder);
-
-                //添加Namespace
-                var @namespaceName = string.IsNullOrEmpty(@namespace) ? DefaultNamespace : @namespace;
-
                 //组装所有的绑定代码
-                var code = BuildContextCode(bindingContext, usingBuilder.ToString(), @namespaceName, convertersBuilder.ToString(), bindingBuilder.ToString(), unbindingBuilder.ToString(), functionBuilder.ToString());
+                var code = BuildContextCode(bindingContext, convertersBuilder.ToString(), bindingBuilder.ToString(), unbindingBuilder.ToString(), functionBuilder.ToString());
 
                 //格式化代码
                 code = Utility.NormalizeCode(code);
@@ -145,27 +135,6 @@ namespace FUICompiler
                     continue;
                 }
                 convertersBuilder.AppendLine($"{converterType} {converterType.ToCSharpName()} = new {converterType}();");
-            }
-        }
-
-        //构造所有的using
-        void BuildUsings(IEnumerable<string> usings, ref StringBuilder usingBuilder)
-        {
-            if (usings == null)
-            {
-                usingBuilder.AppendLine("");
-            }
-            else
-            {
-                foreach (var @using in usings)
-                {
-                    if (string.IsNullOrEmpty(@using))
-                    {
-                        continue;
-                    }
-
-                    usingBuilder.AppendLine($"using {@using};");
-                }
             }
         }
 

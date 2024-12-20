@@ -76,7 +76,7 @@ namespace FUICompiler
         /// <param name="output">输出文件夹</param>
         void TrySaveToFile(ContextBindingInfo info, string output)
         {
-            if (!string.IsNullOrEmpty(output))
+            if (string.IsNullOrEmpty(output))
             {
                 return;
             }
@@ -87,7 +87,8 @@ namespace FUICompiler
             }
 
             var json = Newtonsoft.Json.JsonConvert.SerializeObject(info, Newtonsoft.Json.Formatting.Indented);
-            var fileName = $"{Utility.GetBindingContextTypeName(info)}.binding";
+            //这个文件名要保持和上下文类型的全名一致  以便于后续根据上下文类型查找对应的绑定信息
+            var fileName = $"{Utility.GetBindingContextTypeFullName(info)}.binding";
             var file = Path.Combine(output, fileName);
             File.WriteAllText(file, json);
         }

@@ -11,8 +11,8 @@ const string bindingOutputMark = "--binding_output";
 
 try
 {
-    string workspace = "..\\..\\..\\..\\..\\..\\FUI\\";
-    args = $"--sln={workspace}.\\FUI.sln --project=FUI.Test --output={workspace}.\\Library\\ScriptAssemblies --binding={workspace}.\\Binding\\ --generated={workspace}.\\FUI\\Generated\\ --ctx_type=Mix --binding_output={workspace}.\\FUI\\BindingInfo\\".Split(' ');
+    //string workspace = "..\\..\\..\\..\\..\\..\\FUI\\";
+    //args = $"--sln={workspace}.\\FUI.sln --project=FUI.Test --output={workspace}.\\Library\\ScriptAssemblies --binding={workspace}.\\Binding\\ --generated={workspace}.\\FUI\\Generated\\ --ctx_type=Mix --binding_output={workspace}.\\FUI\\BindingInfo\\".Split(' ');
     var param = ParseArgs(args);
     var compiler = new Compiler(param);
     await compiler.Build();

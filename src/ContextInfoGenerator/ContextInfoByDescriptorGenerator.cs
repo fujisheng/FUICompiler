@@ -17,10 +17,6 @@ namespace FUICompiler
             foreach (var classDeclaration in classDeclarations)
             {
                 var classType = semanticModel.GetDeclaredSymbol(classDeclaration);
-                if(classType.ToString() == "Test.Descriptor.TestDescriptorContextDescriptor")
-                {
-                    var a = 0;
-                }
                 if(!classType.IsContextDescriptor(out var viewModelType))
                 {
                     continue;
