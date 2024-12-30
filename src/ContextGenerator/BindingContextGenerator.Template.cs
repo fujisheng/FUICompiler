@@ -1,4 +1,6 @@
-﻿namespace FUICompiler
+﻿using System.Globalization;
+
+namespace FUICompiler
 {
     /// <summary>
     /// ugui数据绑定上下文生成器
@@ -17,39 +19,23 @@ namespace {{Utility.BindingContextDefaultNamespace}}
 {
     [FUI.ViewModelAttribute(typeof({{contextInfo.viewModelType}}))]
     [FUI.ViewAttribute("{{contextInfo.viewName}}")]
-    public class {{contextInfo.viewModelType.ToCSharpName()}}_{{contextInfo.viewName}}_Binding_Generated : FUI.BindingContext
+    public class {{contextInfo.viewModelType.ToCSharpName()}}_{{contextInfo.viewName}}_Binding_Generated : FUI.BindingContext<{{contextInfo.viewModelType}}>
     {
 {{converters}}
-        public {{contextInfo.viewModelType.ToCSharpName()}}_{{contextInfo.viewName}}_Binding_Generated(FUI.IView view, FUI.Bindable.ObservableObject viewModel) : base(view, viewModel) { }
+        public {{contextInfo.viewModelType.ToCSharpName()}}_{{contextInfo.viewName}}_Binding_Generated(FUI.IView view, {{contextInfo.viewModelType}} viewModel) : base(view, viewModel) { }
 
-        protected override void Binding()
+        protected override void OnBinding()
         {
 {{bindings}}
         }
 
-        protected override void Unbinding()
+        protected override void OnUnbinding()
         {
 {{unbindings}}
         }
 
 {{functions}}
     }
-}
-""";
-        }
-        #endregion
-
-        #region 绑定方法模板
-        /// <summary>
-        /// 构建绑定方法
-        /// </summary>
-        public static string BuildBindingsCode(ContextBindingInfo contextInfo, string bindingItems)
-        {
-            return $$"""
-if(this.ViewModel is {{contextInfo.viewModelType}} {{contextInfo.viewModelType.ToCSharpName()}})
-{
-     {{bindingItems}}
-     return;
 }
 """;
         }
@@ -79,17 +65,34 @@ void {{functionName}}(object sender, {{info.propertyInfo.type}} preValue, {{info
         public static string BuildListBindingCode(PropertyBindingInfo info)
         {
             return $$"""
-FUI.Extensions.BindingContextExtensions.BindingList<{{info.targetInfo.type}}>(element, preValue, @value);
+FUI.BindingContextUtility.BindingList<{{info.targetInfo.type}}>(element, preValue, @value);
+""";
+        }
+
+        /// <summary>
+        /// 构建List解绑方法
+        /// </summary>
+        /// <param name="functionName">方法名</param>
+        /// <param name="info">属性绑定信息</param>
+        /// <returns></returns>
+        public static string BuildListUnbindingFunctionCode(string functionName, PropertyBindingInfo info)
+        {
+            return $$"""
+void {{functionName}}()
+{
+    var element = FUI.Extensions.ViewExtensions.GetElement<{{info.targetInfo.type}}>(this.View, @"{{info.targetInfo.path}}");
+    FUI.BindingContextUtility.UnbindingList<{{info.targetInfo.type}}>(element, this.ViewModel.{{info.propertyInfo.name}});
+}
 """;
         }
 
         /// <summary>
         /// 构建ListUnbinding
         /// </summary>
-        public static string BuildListUnbindingCode(ContextBindingInfo contextInfo, PropertyBindingInfo info)
+        public static string BuildListUnbindingCode(string functionName)
         {
             return $$"""
-FUI.Extensions.BindingContextExtensions.UnbindingList<{{info.targetInfo.type}}>(this, {{contextInfo.viewModelType.ToCSharpName()}}.{{info.propertyInfo.name}}, @"{{info.targetInfo.path}}");
+{{functionName}}();
 """;
         }
 
@@ -103,7 +106,7 @@ FUI.Extensions.BindingContextExtensions.UnbindingList<{{info.targetInfo.type}}>(
         {
             return $$"""
 {{invocation}}
-void {{functionName}}({{contextInfo.viewModelType}} {{contextInfo.viewModelType.ToCSharpName()}})
+void {{functionName}}()
 {
     var element = FUI.Extensions.ViewExtensions.GetElement<{{info.targetInfo.type}}>(this.View, @"{{info.targetInfo.path}}");
     {{operate}}
@@ -119,10 +122,7 @@ void {{functionName}}({{contextInfo.viewModelType}} {{contextInfo.viewModelType.
             return $$"""
 void {{functionName}} ({{info.targetInfo.propertyValueType}} oldValue, {{info.targetInfo.propertyValueType}} newValue)
 {
-    if(this.ViewModel is {{contextInfo.viewModelType}} {{contextInfo.viewModelType.ToCSharpName()}})
-    {
-        {{contextInfo.viewModelType.ToCSharpName()}}.{{info.propertyInfo.name}} = newValue;
-    }
+    this.ViewModel.{{info.propertyInfo.name}} = newValue;
 }
 """;
         }
@@ -156,7 +156,7 @@ element.{{info.targetInfo.propertyName}}.OnValueChanged -= {{invocationName}};
         public static string BuildCommandBindingFunctionCode(ContextBindingInfo contextInfo, CommandBindingInfo info, string functionName, string operate)
         {
             return $$"""
-void {{functionName}}({{contextInfo.viewModelType}} {{contextInfo.viewModelType.ToCSharpName()}})
+void {{functionName}}()
 {
     var element = FUI.Extensions.ViewExtensions.GetElement<{{info.targetInfo.type}}>(this.View, "{{info.targetInfo.path}}");
     {{operate}}
@@ -170,7 +170,7 @@ void {{functionName}}({{contextInfo.viewModelType}} {{contextInfo.viewModelType.
         public static string BuildCommandBindingOperateCode(ContextBindingInfo contextInfo, CommandBindingInfo info)
         {
             return $$"""
-element.{{info.targetInfo.propertyName}}?.AddListener({{contextInfo.viewModelType.ToCSharpName()}}.{{info.commandInfo.name}});
+element.{{info.targetInfo.propertyName}}?.AddListener(this.ViewModel.{{info.commandInfo.name}});
 """;
         }
 
@@ -180,7 +180,7 @@ element.{{info.targetInfo.propertyName}}?.AddListener({{contextInfo.viewModelTyp
         public static string BuildCommandUnbindingOperateCode(ContextBindingInfo contextInfo, CommandBindingInfo info)
         {
             return $$"""
-element.{{info.targetInfo.propertyName}}?.RemoveListener({{contextInfo.viewModelType.ToCSharpName()}}.{{info.commandInfo.name}});
+element.{{info.targetInfo.propertyName}}?.RemoveListener(this.ViewModel.{{info.commandInfo.name}});
 """;
         }
         #endregion

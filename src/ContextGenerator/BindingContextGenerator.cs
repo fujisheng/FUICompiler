@@ -18,25 +18,23 @@ namespace FUICompiler
 
                 var functionBuilder = new StringBuilder();
 
-                //为每个上下文生成对应的绑定代码
-                var bindingItemsBuilder = new StringBuilder();
-                var unbindingItemsBuilder = new StringBuilder();
-
                 //为每个属性生成对应的委托 并添加绑定代码和解绑代码
                 foreach (var property in bindingContext.properties)
                 {
-                    BuildNormalPropertyBinding(bindingContext, property, ref functionBuilder, ref bindingItemsBuilder, ref unbindingItemsBuilder);
+                    BuildNormalPropertyBinding(bindingContext, property, ref functionBuilder, ref bindingBuilder, ref unbindingBuilder);
 
                     //如果是列表 需要单独构建ListUnbinding代码
                     if (property.propertyInfo.isList)
                     {
-                        unbindingItemsBuilder.AppendLine(BuildListUnbindingCode(bindingContext, property));
+                        var listUnbindingFunctionName = $"UnbindingList_{GetPropertyTargetUniqueName(bindingContext, property)}";
+                        functionBuilder.AppendLine(BuildListUnbindingFunctionCode(listUnbindingFunctionName, property));
+                        unbindingBuilder.AppendLine(BuildListUnbindingCode(listUnbindingFunctionName));
                     }
 
                     //如果是双向绑定需要构建从View到ViewModel的绑定
                     if (property.bindingMode.HasFlag(BindingMode.OneWayToSource))
                     {
-                        BuildV2VMBinding(bindingContext, property, ref bindingItemsBuilder, ref unbindingItemsBuilder, ref functionBuilder);
+                        BuildV2VMBinding(bindingContext, property, ref bindingBuilder, ref unbindingBuilder, ref functionBuilder);
                     }
 
                     //如果有转换器则需要记录以便生成转换器构造代码
@@ -49,14 +47,8 @@ namespace FUICompiler
                 //为命令生成绑定和解绑代码
                 foreach (var command in bindingContext.commands)
                 {
-                    BuildCommandBinding(bindingContext, command, ref bindingItemsBuilder, ref unbindingItemsBuilder, ref functionBuilder);
+                    BuildCommandBinding(bindingContext, command, ref bindingBuilder, ref unbindingBuilder, ref functionBuilder);
                 }
-
-                //组装绑定代码
-                bindingBuilder.AppendLine(BuildBindingsCode(bindingContext, bindingItemsBuilder.ToString()));
-
-                //组装解绑代码
-                unbindingBuilder.AppendLine(BuildBindingsCode(bindingContext, unbindingItemsBuilder.ToString()));
 
                 //生成所有的转换器构造代码
                 var convertersBuilder = new StringBuilder();
@@ -93,7 +85,6 @@ namespace FUICompiler
             }
 
             //为属性生成对应的绑定方法
-            var vmName = bindingContext.viewModelType.ToCSharpName();
             var propertyTargetUniqueName = GetPropertyTargetUniqueName(bindingContext, property);
             var propertyChangedFunctionName = $"PropertyChanged__{propertyTargetUniqueName}";
 
@@ -101,10 +92,10 @@ namespace FUICompiler
             functionBuilder.AppendLine(BuildPropertyChangedFunctionCode(propertyChangedFunctionName, convert, listBinding, property));
 
             //生成属性绑定代码
-            bindingItemsBuilder.AppendLine($"{vmName}.{delegateName} += {propertyChangedFunctionName};");
+            bindingItemsBuilder.AppendLine($"this.ViewModel.{delegateName} += {propertyChangedFunctionName};");
 
             //生成属性解绑代码
-            unbindingItemsBuilder.AppendLine($"{vmName}.{delegateName} -= {propertyChangedFunctionName};");
+            unbindingItemsBuilder.AppendLine($"this.ViewModel.{delegateName} -= {propertyChangedFunctionName};");
         }
 
         /// <summary>
@@ -141,7 +132,6 @@ namespace FUICompiler
         /// <summary>
         /// 生成从View到ViewModel的绑定代码和解绑代码
         /// </summary>
-        /// <param name="vmName">ViewModel名字</param>
         /// <param name="property">绑定配置</param>
         /// <param name="bindingItemBuilder">绑定代码构建器</param>
         /// <param name="unbindingItemBuilder">解绑代码构建器</param>
@@ -151,12 +141,11 @@ namespace FUICompiler
             ref StringBuilder unbindingItemBuilder,
             ref StringBuilder functionBuilder)
         {
-            var vmName = contextInfo.viewModelType.ToCSharpName();
             var propertyTargetUniqueName = GetPropertyTargetUniqueName(contextInfo, property);
             var bindingFunctionName = $"BindingV2VM__{propertyTargetUniqueName}";
             var unbindingFunctionName = $"UnbindingV2VM__{propertyTargetUniqueName}";
-            bindingItemBuilder.AppendLine($"{bindingFunctionName}({vmName});");
-            unbindingItemBuilder.AppendLine($"{unbindingFunctionName}({vmName});");
+            bindingItemBuilder.AppendLine($"{bindingFunctionName}();");
+            unbindingItemBuilder.AppendLine($"{unbindingFunctionName}();");
 
             var invocationName = $"V2VMInvocation__{propertyTargetUniqueName}";
 
@@ -172,7 +161,6 @@ namespace FUICompiler
         /// <summary>
         /// 构建命令绑定和解绑代码
         /// </summary>
-        /// <param name="vmName">ViewModel名字</param>
         /// <param name="command">绑定配置</param>
         /// <param name="bindingItemBuilder">绑定代码构建器</param>
         /// <param name="unbindingItemBuilder">解绑代码构建器</param>
@@ -182,13 +170,12 @@ namespace FUICompiler
             ref StringBuilder unbindingItemBuilder,
             ref StringBuilder functionBuilder)
         {
-            var vmName = contextInfo.viewModelType.ToCSharpName();
             var commandTargetUniqueName = GetCommandTargetUniqueName(contextInfo, command);
             var bindingFunctionName = $"BindingCommand__{commandTargetUniqueName}";
             var unbindingFunctionName = $"UnbindingCommand__{commandTargetUniqueName}";
 
-            bindingItemBuilder.AppendLine($"{bindingFunctionName}({vmName});");
-            unbindingItemBuilder.AppendLine($"{unbindingFunctionName}({vmName});");
+            bindingItemBuilder.AppendLine($"{bindingFunctionName}();");
+            unbindingItemBuilder.AppendLine($"{unbindingFunctionName}();");
 
             var bindingOperate = BuildCommandBindingOperateCode(contextInfo, command);
             var unbindingOperate = BuildCommandUnbindingOperateCode(contextInfo, command);
