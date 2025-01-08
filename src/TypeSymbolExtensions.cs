@@ -11,25 +11,38 @@ namespace FUICompiler
         /// <summary>
         /// 判断一个类型是否继承自某个类型或者实现了某个接口
         /// </summary>
-        /// <param name="symbol">源类型</param>
-        /// <param name="type">目标类型</param>
+        /// <param name="self">源类型</param>
+        /// <param name="other">目标类型</param>
         /// <returns></returns>
-        internal static bool Extends(this ITypeSymbol symbol, Type type)
+        internal static bool Extends(this ITypeSymbol self, Type other)=>Extends(self, other, (s, t) => s.Matches(t));
+
+        /// <summary>
+        /// 判断一个类型是否继承自另一个类型或者实现了某个接口
+        /// </summary>
+        /// <param name="symbol">源类型</param>
+        /// <param name="other">目标类型</param>
+        /// <returns></returns>
+        internal static bool Extends(this ITypeSymbol symbol, ITypeSymbol other) => Extends(symbol, other, (s, t) => s.Matches(t));
+
+        /// <summary>
+        /// 判断一个类型是否继承自另一个类型或者实现了某个接口
+        /// </summary>
+        static bool Extends<T>(this ITypeSymbol self, T other, Func<ITypeSymbol, T, bool> matches)
         {
-            if (symbol == null || type == null)
+            if (self == null || other == null)
             {
                 return false;
             }
 
             var openList = cache;
             openList.Clear();
-            openList.Enqueue(symbol);
+            openList.Enqueue(self);
 
-            while(openList.Count > 0)
+            while (openList.Count > 0)
             {
                 var current = openList.Dequeue();
 
-                if (current.Matches(type))
+                if (matches.Invoke(current, other))
                 {
                     return true;
                 }
@@ -47,6 +60,7 @@ namespace FUICompiler
 
             return false;
         }
+
 
         /// <summary>
         /// 判断一个类型是否和另一个类型匹配 
@@ -101,6 +115,55 @@ namespace FUICompiler
         }
 
         /// <summary>
+        /// 判断一个类型是否和另一个类型匹配 
+        /// </summary>
+        /// <param name="self">源类型</param>
+        /// <param name="other">目标类型</param>
+        /// <returns></returns>
+        internal static bool Matches(this ITypeSymbol self, ITypeSymbol other)
+        {
+            switch (self.SpecialType)
+            {
+                case SpecialType.System_Void:
+                case SpecialType.System_Boolean:
+                case SpecialType.System_Int32:
+                case SpecialType.System_Single:
+                    return self.SpecialType == other.SpecialType;
+            }
+
+            if (other is IArrayTypeSymbol otherArray)
+            {
+                return self is IArrayTypeSymbol array && Matches(array.ElementType, otherArray);
+            }
+
+            if (!(self is INamedTypeSymbol selfNamed) || !(other is INamedTypeSymbol otherNamed))
+            {
+                return false;
+            }
+
+            if (selfNamed.IsGenericType && otherNamed.IsGenericType)
+            {
+                var otherTypeArgs = otherNamed.TypeArguments;
+                if (otherTypeArgs.Length != selfNamed.TypeArguments.Length)
+                {
+                    return false;
+                }
+
+                for (var i = 0; i < otherTypeArgs.Length; i++)
+                {
+                    if (!Matches(selfNamed.TypeArguments[i], otherTypeArgs[i]))
+                    {
+                        return false;
+                    }
+                }
+
+                return Matches(selfNamed.ConstructedFrom, otherNamed.ConstructedFrom);
+            }
+
+            return selfNamed.MetadataName == other.MetadataName && selfNamed.ContainingNamespace?.ToDisplayString() == other.ContainingNamespace?.ToDisplayString();
+        }
+
+        /// <summary>
         /// 判断某个类型是否是指定类型
         /// </summary>
         /// <param name="symbol">要判断的类型</param>
@@ -111,6 +174,9 @@ namespace FUICompiler
             return Matches(symbol, type);
         }
 
+        /// <summary>
+        /// 获取类型的所有基类和自身
+        /// </summary>
         internal static IEnumerable<ITypeSymbol> GetBaseTypesAndThis(this ITypeSymbol type)
         {
             var current = type;
@@ -119,55 +185,6 @@ namespace FUICompiler
                 yield return current;
                 current = current.BaseType;
             }
-        }
-
-        internal static bool InheritsFromOrEquals(this ITypeSymbol type, ITypeSymbol baseType)
-        {
-            foreach (var t in type.GetBaseTypesAndThis())
-            {
-                if (SymbolEqualityComparer.Default.Equals(t, baseType))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        internal static bool InheritsFrom(this ITypeSymbol type, Type baseType)
-        {
-            foreach (var t in type.GetBaseTypesAndThis())
-            {
-                if (t.IsType(baseType))
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        public static bool IsGenericTypeFrom(this ITypeSymbol type, Type baseType)
-        {
-            if (!baseType.IsGenericType)
-            {
-                return false;
-            }
-
-            foreach (var t in type.GetBaseTypesAndThis())
-            {
-                if (t is not INamedTypeSymbol named)
-                {
-                    continue;
-                }
-
-                if (named.IsGenericType 
-                    && named.TypeArguments.Count() == baseType.GetGenericArguments().Length 
-                    && named.ConstructedFrom.Matches(baseType.GetGenericTypeDefinition().BaseType))
-                {
-                    return true;
-                }
-            }
-            return false;
         }
     }
 }
