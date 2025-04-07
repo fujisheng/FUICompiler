@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using System.Xml.Linq;
 
 namespace FUICompiler
 {
@@ -35,6 +36,7 @@ namespace FUICompiler
                     if (property.bindingMode.HasFlag(BindingMode.OneWayToSource))
                     {
                         BuildV2VMBinding(bindingContext, property, ref bindingBuilder, ref unbindingBuilder, ref functionBuilder);
+                        BuildV2VMInit(bindingContext, property, ref bindingBuilder, ref functionBuilder);
                     }
 
                     //如果有转换器则需要记录以便生成转换器构造代码
@@ -149,13 +151,51 @@ namespace FUICompiler
 
             var invocationName = $"V2VMInvocation__{propertyTargetUniqueName}";
 
-            var invocation = BuildV2VMInvocationFunctionCode(contextInfo, property, invocationName);
+            var convert = BuildConvertBack(contextInfo.viewModelType, property, "@newValue");
+            var invocation = BuildV2VMInvocationFunctionCode(contextInfo, property, invocationName, convert);
 
             var bindingOperate = BuildV2VMBindingOperateCode(invocationName, property);
             var unbindingOperate = BuildV2VMUnbindingOperateCode(invocationName, property);
 
             functionBuilder.AppendLine(BuildV2VMBindingFunctionCode(contextInfo, property, invocation, bindingFunctionName, bindingOperate));
             functionBuilder.AppendLine(BuildV2VMBindingFunctionCode(contextInfo, property, string.Empty, unbindingFunctionName, unbindingOperate));
+        }
+
+        /// <summary>
+        /// 构建值转换器
+        /// </summary>
+        string BuildConvertBack(string viewModelType, PropertyBindingInfo property, string value)
+        {
+            var convertBuilder = new StringBuilder();
+
+            if (property.converterInfo != null)
+            {
+                convertBuilder.AppendLine($"var convertedValue = {property.converterInfo.type.ToCSharpName()}.ConvertBack({value});");
+            }
+            else
+            {
+                convertBuilder.AppendLine($"var convertedValue = {value};");
+            }
+            return convertBuilder.ToString();
+        }
+
+        /// <summary>
+        /// 构建从View到ViewModel的值初始化代码
+        /// </summary>
+        /// <param name="contextInfo">上下文信息</param>
+        /// <param name="property">属性绑定信息</param>
+        /// <param name="bindingItemBuilder">绑定方法builder</param>
+        /// <param name="functionBuilder">方法builder</param>
+        void BuildV2VMInit(ContextBindingInfo contextInfo, PropertyBindingInfo property,
+            ref StringBuilder bindingItemBuilder,
+            ref StringBuilder functionBuilder)
+        {
+            var convertValue = $"element.{property.targetInfo.propertyName}";
+            var convert = BuildConvertBack(contextInfo.viewModelType, property, convertValue);
+            var propertyTargetUniqueName = GetPropertyTargetUniqueName(contextInfo, property);
+            var initFunctionName = $"InitV2VM__{propertyTargetUniqueName}";
+            functionBuilder.AppendLine(BuildV2VMInitFunctionCode(contextInfo, property, initFunctionName, convert));
+            bindingItemBuilder.AppendLine($"{initFunctionName}();");
         }
 
         /// <summary>

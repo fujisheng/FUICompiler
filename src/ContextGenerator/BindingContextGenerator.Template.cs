@@ -115,14 +115,39 @@ void {{functionName}}()
         }
 
         /// <summary>
+        /// 构建View到ViewModel的值初始化方法
+        /// </summary>
+        /// <param name="contextInfo"></param>
+        /// <param name="info"></param>
+        /// <param name="functionName"></param>
+        /// <returns></returns>
+        public static string BuildV2VMInitFunctionCode(ContextBindingInfo contextInfo, PropertyBindingInfo info, string functionName, string converters)
+        {
+            return $$"""
+void {{functionName}}()
+{
+    if(this.ViewModel.{{info.propertyInfo.name}} != default)
+    {
+        return;
+    }
+
+    var element = FUI.Extensions.ViewExtensions.GetElement<{{info.targetInfo.type}}>(this.View, @"{{info.targetInfo.path}}");
+    {{converters}}
+    this.ViewModel.{{info.propertyInfo.name}} = convertedValue;
+}
+""";
+        }
+
+        /// <summary>
         /// 构建View到ViewModel绑定执行的方法
         /// </summary>
-        public static string BuildV2VMInvocationFunctionCode(ContextBindingInfo contextInfo, PropertyBindingInfo info, string functionName)
+        public static string BuildV2VMInvocationFunctionCode(ContextBindingInfo contextInfo, PropertyBindingInfo info, string functionName, string converters)
         {
             return $$"""
 void {{functionName}} ({{info.targetInfo.propertyValueType}} oldValue, {{info.targetInfo.propertyValueType}} newValue)
 {
-    this.ViewModel.{{info.propertyInfo.name}} = newValue;
+    {{converters}}
+    this.ViewModel.{{info.propertyInfo.name}} = convertedValue;
 }
 """;
         }
