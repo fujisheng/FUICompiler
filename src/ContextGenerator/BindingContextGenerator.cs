@@ -190,7 +190,7 @@ namespace FUICompiler
             ref StringBuilder bindingItemBuilder,
             ref StringBuilder functionBuilder)
         {
-            var convertValue = $"element.{property.targetInfo.propertyName}";
+            var convertValue = $"element.{property.targetInfo.propertyName}.Value";
             var convert = BuildConvertBack(contextInfo.viewModelType, property, convertValue);
             var propertyTargetUniqueName = GetPropertyTargetUniqueName(contextInfo, property);
             var initFunctionName = $"InitV2VM__{propertyTargetUniqueName}";
