@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace FUICompiler
 {
     /// <summary>
-    /// 可绑定对象属性修改器 为属性Set添加委托调用 并将类修改为public partial
+    /// 修改可观察对象属性的set方法添加委托调用 并添加partial和public修饰符
     /// </summary>
     internal class ObservableObjectPropertyModifier
     {
@@ -17,95 +17,108 @@ namespace FUICompiler
             {
                 var type = semanticModel.GetDeclaredSymbol(oldClass);
 
-                if (!type.IsObservableObject())
+                if (!type.IsObservableObject() || type.IsAbstract || type.IsStatic)
                 {
                     return oldClass;
                 }
 
-                //如果是静态类或者抽象类直接不管
-                if (type.IsAbstract || type.IsStatic)
+                var newModifiers = oldClass.Modifiers;
+                bool hasPublic = newModifiers.Any(m => m.IsKind(SyntaxKind.PublicKeyword));
+                var internalToken = newModifiers.FirstOrDefault(m => m.IsKind(SyntaxKind.InternalKeyword));
+
+                //处理public修饰符（避免重复）
+                if (internalToken != default(SyntaxToken))
                 {
-                    return oldClass;
+                    //替换internal为public（原类无public时）
+                    newModifiers = newModifiers.Replace(internalToken, SyntaxFactory.Token(SyntaxKind.PublicKeyword));
+                    hasPublic = true;
+                }
+                else if (!hasPublic)
+                {
+                    //原类无internal且无public时，添加public（带前导空格）
+                    newModifiers = newModifiers.Add(SyntaxFactory.Token(SyntaxKind.PublicKeyword)
+                        .WithLeadingTrivia(SyntaxFactory.Whitespace(" ")));
                 }
 
-                //修改其修饰符为 public partial 
-                var modifiers = SyntaxFactory.TokenList(
-                        SyntaxFactory.Token(SyntaxKind.PublicKeyword).WithTrailingTrivia(SyntaxFactory.Whitespace(" ")),
-                        SyntaxFactory.Token(SyntaxKind.PartialKeyword).WithTrailingTrivia(SyntaxFactory.Whitespace(" "))
-                    );
-                var newClass = oldClass.WithModifiers(modifiers);
-
-                //遍历所有属性 并修改其Get Set 以调用其对应值更改委托
-                var propertites = newClass.ChildNodes().OfType<PropertyDeclarationSyntax>().ToArray();
-                newClass = newClass.ReplaceNodes(propertites, (property, _) =>
+                //添加partial修饰符（确保与前一个修饰符、class关键字有空格）
+                if (!newModifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)))
                 {
-                    //if (!Utility.IsObservableProperty(newClass, property))
-                    //{
-                    //    return property;
-                    //}
+                    //为partial设置前导空格（与前一个修饰符）和尾随空格（与class关键字）
+                    var partialToken = SyntaxFactory.Token(SyntaxKind.PartialKeyword)
+                        .WithLeadingTrivia(SyntaxFactory.Whitespace(" "))  // 与前一个修饰符的空格
+                        .WithTrailingTrivia(SyntaxFactory.Whitespace(" ")); // 与class关键字的空格
+                    newModifiers = newModifiers.Add(partialToken);
+                }
 
+                var newClass = oldClass.WithModifiers(newModifiers);
+
+                var properties = newClass.ChildNodes().OfType<PropertyDeclarationSyntax>().ToArray();
+                newClass = newClass.ReplaceNodes(properties, (property, _) =>
+                {
                     var propertyName = property.Identifier.Text;
                     var fieldName = Utility.GetPropertyBackingFieldName(propertyName);
                     var delegateName = Utility.GetPropertyChangedDelegateName(propertyName);
 
                     var newProperty = property;
-                    //如果这个属性包含初始化语句 则需要移除
                     if (newProperty.Initializer != null)
                     {
-                        //移除属性赋值 "=xxx"
-                        newProperty = newProperty.WithInitializer(null);
-                        //移除属性后面的;号  这儿移除后会同时移除掉其换行符  所以再加上去
-                        var newToken = SyntaxFactory.MissingToken(SyntaxKind.SemicolonToken);
-                        newProperty = newProperty.ReplaceToken(newProperty.SemicolonToken, newToken);
-                        var endOfLine = SyntaxFactory.EndOfLine("\n");
-                        newProperty = newProperty.WithTrailingTrivia(endOfLine);
+                        // 保留原属性的尾随Trivia（如换行、空行）
+                        var originalTrailingTrivia = property.GetTrailingTrivia();
+                        newProperty = newProperty.WithInitializer(null)
+                            .WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.None))
+                            .WithTrailingTrivia(originalTrailingTrivia); // 恢复原尾随Trivia
                     }
+
                     return ModifyPropertyGetSet(newProperty, fieldName, delegateName);
                 });
+
                 return newClass;
             });
         }
 
-        //为了不影响报错时的代码定位，这里都保持一行
         const string SetBody = @"if(System.Collections.Generic.EqualityComparer<{Type}>.Default.Equals(this.{FieldName}, value)) {return; }var preValue = this.{FieldName}; this.{FieldName} = value; {DelegateName}?.Invoke(this, preValue, value);";
         const string GetBody = "return this.{FieldName};";
 
         PropertyDeclarationSyntax ModifyPropertyGetSet(PropertyDeclarationSyntax property, string fieldName, string delegateName)
         {
-            if (property == null)
+            if (property?.AccessorList == null)
             {
                 return null;
             }
 
-            if (property.AccessorList == null)
-            {
-                return null;
-            }
-
-            var oldGet = property.AccessorList?.Accessors.FirstOrDefault(a => a.Kind() == SyntaxKind.GetAccessorDeclaration);
-            var oldSet = property.AccessorList?.Accessors.FirstOrDefault(a => a.Kind() == SyntaxKind.SetAccessorDeclaration);
+            var oldGet = property.AccessorList.Accessors.FirstOrDefault(a => a.Kind() == SyntaxKind.GetAccessorDeclaration);
+            var oldSet = property.AccessorList.Accessors.FirstOrDefault(a => a.Kind() == SyntaxKind.SetAccessorDeclaration);
             if (oldGet == null || oldSet == null)
             {
                 return null;
             }
 
-            oldGet = oldGet.WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.None));
-            oldSet = oldSet.WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.None));
+            // 处理自动属性（Body为null的情况）
+            var getTrivia = oldGet.Body != null 
+                ? oldGet.Body.GetLeadingTrivia().Concat(oldGet.Body.GetTrailingTrivia()) 
+                : oldGet.GetLeadingTrivia().Concat(oldGet.GetTrailingTrivia());
+            var getBody = SyntaxFactory.ParseStatement(GetBody.Replace("{FieldName}", fieldName))
+                .WithLeadingTrivia(getTrivia);
 
-            var setBodyString = SetBody.Replace("{FieldName}", fieldName).Replace("{Type}", property.Type.ToString()).Replace("{DelegateName}", delegateName);
-            var setBody = SyntaxFactory.ParseStatement(setBodyString);
-            var getBodyString = GetBody.Replace("{FieldName}", fieldName);
-            var getBody = SyntaxFactory.ParseStatement(getBodyString);
-            var newProperty = property.WithAccessorList(
-                property.AccessorList.WithAccessors(
-                    SyntaxFactory.List(
-                        new AccessorDeclarationSyntax[]
-                        {
-                            oldGet.WithBody(SyntaxFactory.Block(getBody)),
-                            oldSet.WithBody(SyntaxFactory.Block(setBody))
-                        })
-                ));
-            return newProperty;
+            var setTrivia = oldSet.Body != null 
+                ? oldSet.Body.GetLeadingTrivia().Concat(oldSet.Body.GetTrailingTrivia()) 
+                : oldSet.GetLeadingTrivia().Concat(oldSet.GetTrailingTrivia());
+            var setBody = SyntaxFactory.ParseStatement(SetBody
+                    .Replace("{FieldName}", fieldName)
+                    .Replace("{Type}", property.Type.ToString())
+                    .Replace("{DelegateName}", delegateName))
+                .WithLeadingTrivia(setTrivia);
+
+            // 显式块访问器不需要分号，移除分号Token
+            return property.WithAccessorList(
+                property.AccessorList.WithAccessors(SyntaxFactory.List(new[]
+                {
+                    oldGet.WithBody(SyntaxFactory.Block(getBody))
+                        .WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.None)), // 移除get访问器的分号
+                    oldSet.WithBody(SyntaxFactory.Block(setBody))
+                        .WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.None))  // 移除set访问器的分号
+                }))
+            );
         }
     }
 }

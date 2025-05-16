@@ -12,7 +12,7 @@ namespace FUICompiler
             propertyModifier = new ObservableObjectPropertyModifier();
         }
 
-        internal async Task<(Project project, List<Source> addition)> Generate(Project oldProject, Compilation compilation)
+        internal async Task<(Project project, List<Source> addition)> Generate(Project oldProject, Compilation compilation, BuildParam param)
         {
             var addition = new List<Source>();
             List<(DocumentId remove, Document add)> modifiedDocument = new List<(DocumentId remove, Document add)>();
@@ -36,6 +36,17 @@ namespace FUICompiler
 
                 var newDocument = document.WithSyntaxRoot(newRoot);
                 modifiedDocument.Add((document.Id, newDocument));
+
+                if (!string.IsNullOrEmpty(param.modifiedOutput))
+                {
+                    if (!Directory.Exists(param.modifiedOutput))
+                    {
+                        Directory.CreateDirectory(param.modifiedOutput);
+                    }
+
+                    var filePath = $"{param.modifiedOutput}\\{newDocument.Name}";
+                    File.WriteAllText(filePath, newDocument.GetTextAsync().Result.ToString());
+                }
             }
 
             foreach (var item in modifiedDocument)

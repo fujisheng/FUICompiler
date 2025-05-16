@@ -8,11 +8,12 @@ const string bindingConfigMark = "--binding";
 const string generatedPathMark = "--generated";
 const string contextGenerateTypeMark = "--ctx_type";
 const string bindingOutputMark = "--binding_output";
+const string modifiedOutputMark = "--modified_output";
 
 try
 {
-    //string workspace = "..\\..\\..\\..\\..\\..\\FUI\\";
-    //args = $"--sln={workspace}.\\FUI.sln --project=FUI.Test --output={workspace}.\\Library\\ScriptAssemblies --binding={workspace}.\\Binding\\ --generated={workspace}.\\FUI\\Generated\\  --binding_output={workspace}.\\FUI\\BindingInfo\\".Split(' ');
+    //string workspace = "..\\..\\..\\..\\..\\..\\workspace\\AlienExodus\\Client\\";
+    //args = $"--sln={workspace}.\\Client.sln --project=Game.UI --output={workspace}.\\Library\\ScriptAssemblies --binding={workspace}.\\Binding\\ --generated={workspace}.\\FUI\\Generated\\  --binding_output={workspace}.\\FUI\\BindingInfo\\".Split(' ');
     var param = ParseArgs(args);
     var compiler = new Compiler(param);
     await compiler.Build();
@@ -36,6 +37,7 @@ BuildParam ParseArgs(string[] args)
     var generatedPathIndex = Array.FindIndex(args, (k) => k.StartsWith(generatedPathMark));
     var contextGenerateTypeIndex = Array.FindIndex(args, (k) => k.StartsWith(contextGenerateTypeMark));
     var bindingOutputIndex = Array.FindIndex(args, (k) => k.StartsWith(bindingOutputMark));
+    var modifiedOutputIndex = Array.FindIndex(args, (k) => k.StartsWith(modifiedOutputMark));
 
     if (solutionPathIndex == -1 || projectNameIndex == -1 || outputIndex == -1)
     {
@@ -50,6 +52,7 @@ BuildParam ParseArgs(string[] args)
         bindingPath: bindingPathIndex == -1 ? string.Empty : args[bindingPathIndex].Substring(bindingConfigMark.Length + 1),
         generatedPath: generatedPathIndex == -1 ? string.Empty : args[generatedPathIndex].Substring(generatedPathMark.Length + 1),
         contextGenerateType: contextGenerateTypeIndex == -1 ? BindingContextGenerateType.All : (BindingContextGenerateType)int.Parse(args[contextGenerateTypeIndex].Substring(contextGenerateTypeMark.Length + 1)),
-        bindingOutput: bindingOutputIndex == -1 ? string.Empty : args[bindingOutputIndex].Substring(bindingOutputMark.Length + 1)
+        bindingOutput: bindingOutputIndex == -1 ? string.Empty : args[bindingOutputIndex].Substring(bindingOutputMark.Length + 1),
+        modifiedOutput: modifiedOutputIndex == -1 ? string.Empty : args[modifiedOutputIndex].Substring(modifiedOutputMark.Length + 1)
     );
 }

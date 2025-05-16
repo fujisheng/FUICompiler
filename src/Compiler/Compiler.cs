@@ -50,7 +50,7 @@ namespace FUICompiler
             List<Source> addition = new List<Source>();
 
             //生成ObservableObject相关代码
-            var (newProject, append) = await observableObjectGenerator.Generate(project, compilation);
+            var (newProject, append) = await observableObjectGenerator.Generate(project, compilation, param);
             addition.AddRange(append);
             project = newProject;
 
